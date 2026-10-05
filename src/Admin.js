@@ -1,270 +1,315 @@
-import React, { useState, useEffect } from "react";
-import { db } from "./firebase";
-import { collection, addDoc, getDocs, query, orderBy } from "firebase/firestore";
+import React, { useState, useEffect } from 'react';
+import { db } from './firebase';
+import { collection, addDoc, getDocs, deleteDoc, doc, setDoc, getDoc, updateDoc } from 'firebase/firestore';
 
-function Admin() {
-  const [activeTab, setActiveTab] = useState("tests");
+const Admin = () => {
+  const [activeTab, setActiveTab] = useState('dashboard');
+  const [stats, setStats] = useState({ totalPatients: 0, totalRevenue: 0 });
+  const [promoCodes, setPromoCodes] = useState([]);
+  const [newPromo, setNewPromo] = useState({ code: '', discount: '', type: 'percentage' });
+  const [distanceSettings, setDistanceSettings] = useState({ baseDistance: '', baseFee: '', extraPerKm: '' });
+  const [categories, setCategories] = useState([]);
+  const [newCategoryName, setNewCategoryName] = useState('');
+  const [newTest, setNewTest] = useState({ name: '', price: '', refRange: '', unit: '', categoryId: '' });
 
-  return (
-    <div className="min-h-screen bg-gray-50 font-sans">
-      
-      {/* OWNER HEADER */}
-      <div className="bg-gray-900 text-white pb-24 pt-8 px-6">
-        <div className="max-w-7xl mx-auto flex justify-between items-end">
-          <div>
-            <h1 className="text-4xl font-black tracking-tight text-white mb-2">Owner Dashboard</h1>
-            <p className="text-gray-400 font-medium text-lg">Sri Balaji Diagnostics Management System</p>
-          </div>
-          <div className="hidden md:block bg-gray-800 p-4 rounded-xl border border-gray-700">
-            <p className="text-xs text-gray-400 uppercase tracking-widest font-bold mb-1">System Status</p>
-            <p className="text-green-400 font-bold flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse"></span> Online & Secure
-            </p>
-          </div>
-        </div>
-      </div>
+  useEffect(() => {
+    fetchDashboardStats();
+    fetchPromoCodes();
+    fetchDistanceSettings();
+    fetchCategories();
+  }, []);
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 -mt-16">
-        
-        {/* TAB NAVIGATION */}
-        <div className="bg-white rounded-t-2xl shadow-sm border border-gray-200 p-2 flex gap-2 overflow-x-auto">
-          <button 
-            onClick={() => setActiveTab("tests")} 
-            className={`flex-1 min-w-[150px] py-4 rounded-xl font-bold text-sm md:text-base transition-all ${
-              activeTab === "tests" ? "bg-blue-600 text-white shadow-md" : "text-gray-500 hover:bg-gray-50"
-            }`}
-          >
-            🧪 Catalog Management
-          </button>
-          <button 
-            onClick={() => setActiveTab("reports")} 
-            className={`flex-1 min-w-[150px] py-4 rounded-xl font-bold text-sm md:text-base transition-all ${
-              activeTab === "reports" ? "bg-blue-600 text-white shadow-md" : "text-gray-500 hover:bg-gray-50"
-            }`}
-          >
-            📂 Completed Reports
-          </button>
-          <button 
-            onClick={() => setActiveTab("commissions")} 
-            className={`flex-1 min-w-[150px] py-4 rounded-xl font-bold text-sm md:text-base transition-all ${
-              activeTab === "commissions" ? "bg-blue-600 text-white shadow-md" : "text-gray-500 hover:bg-gray-50"
-            }`}
-          >
-            💰 Doctor Ledger
-          </button>
-        </div>
-
-        {/* TAB CONTENT AREAS */}
-        <div className="bg-white rounded-b-2xl shadow-md border-x border-b border-gray-200 p-6 md:p-10 min-h-[600px]">
-          {activeTab === "tests" && <CatalogManagementTab />}
-          {activeTab === "reports" && <PastReportsTab />}
-          {activeTab === "commissions" && <CommissionTab />}
-        </div>
-        
-        <p className="text-center text-xs text-gray-400 font-medium mt-8 pb-8">
-            © 2026 Sri Balaji Diagnostics | Owner Admin Portal
-        </p>
-      </div>
-    </div>
-  );
-}
-
-// ==========================================
-// COMPONENT: CATALOG MANAGEMENT
-// ==========================================
-const CatalogManagementTab = () => {
-  const [testName, setTestName] = useState("");
-  const [price, setPrice] = useState("");
-  const [isSaving, setIsSaving] = useState(false);
-
-  const handleSaveTest = async () => {
-    if(!testName || !price) return alert("Please fill both name and price.");
-    setIsSaving(true);
+  const fetchDashboardStats = async () => {
     try {
-      await addDoc(collection(db, "tests"), {
-        name: testName,
-        price: Number(price),
-        isAvailable: true
+      const querySnapshot = await getDocs(collection(db, "patients"));
+      let totalRev = 0, count = 0;
+      querySnapshot.forEach((doc) => {
+        count++;
+        totalRev += Number(doc.data().totalAmount || 0);
       });
-      alert("✅ Test added successfully to the public catalog!");
-      setTestName(""); setPrice("");
-    } catch(err) {
-      console.error(err);
-      alert("Error saving test.");
-    }
-    setIsSaving(false);
+      setStats({ totalPatients: count, totalRevenue: totalRev });
+    } catch (error) { console.error(error); }
+  };
+
+  const fetchPromoCodes = async () => {
+    try {
+      const querySnapshot = await getDocs(collection(db, "promoCodes"));
+      setPromoCodes(querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    } catch (error) { console.error(error); }
+  };
+
+  const handleAddPromo = async (e) => {
+    e.preventDefault();
+    if (!newPromo.code || !newPromo.discount) return alert("Fill all fields");
+    try {
+      await addDoc(collection(db, "promoCodes"), {
+        code: newPromo.code.toUpperCase(), discount: Number(newPromo.discount), type: newPromo.type, createdAt: new Date().toISOString()
+      });
+      setNewPromo({ code: '', discount: '', type: 'percentage' });
+      fetchPromoCodes();
+    } catch (error) { console.error(error); }
+  };
+
+  const handleDeletePromo = async (id) => {
+    try { await deleteDoc(doc(db, "promoCodes", id)); fetchPromoCodes(); } 
+    catch (error) { console.error(error); }
+  };
+
+  const fetchDistanceSettings = async () => {
+    try {
+      const docSnap = await getDoc(docRef);
+      if (docSnap.exists()) setDistanceSettings(docSnap.data());
+      else setDistanceSettings({ baseDistance: 5, baseFee: 100, extraPerKm: 20 });
+    } catch (error) { console.error(error); }
+  };
+
+  const docRef = doc(db, "settings", "homeCollection");
+  const handleSaveDistanceSettings = async (e) => {
+    e.preventDefault();
+    try {
+      await setDoc(docRef, {
+        baseDistance: Number(distanceSettings.baseDistance), baseFee: Number(distanceSettings.baseFee), extraPerKm: Number(distanceSettings.extraPerKm)
+      });
+      alert("Settings saved");
+    } catch (error) { console.error(error); }
+  };
+
+  const fetchCategories = async () => {
+    try {
+      const querySnapshot = await getDocs(collection(db, "testCategories"));
+      const cats = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setCategories(cats);
+      if (cats.length > 0 && !newTest.categoryId) setNewTest(prev => ({ ...prev, categoryId: cats[0].id }));
+    } catch (error) { console.error(error); }
+  };
+
+  const handleAddCategory = async (e) => {
+    e.preventDefault();
+    if (!newCategoryName) return;
+    try {
+      await addDoc(collection(db, "testCategories"), { name: newCategoryName, tests: [] });
+      setNewCategoryName(''); fetchCategories();
+    } catch (error) { console.error(error); }
+  };
+
+  const handleDeleteCategory = async (id) => {
+    if (!window.confirm("Delete subgroup?")) return;
+    try { await deleteDoc(doc(db, "testCategories", id)); fetchCategories(); } 
+    catch (error) { console.error(error); }
+  };
+
+  const handleAddTest = async (e) => {
+    e.preventDefault();
+    if (!newTest.categoryId || !newTest.name || !newTest.price) return alert("Fill required fields.");
+    try {
+      const targetCategory = categories.find(c => c.id === newTest.categoryId);
+      const updatedTests = [...(targetCategory.tests || []), { id: Date.now().toString(), name: newTest.name, price: Number(newTest.price), refRange: newTest.refRange, unit: newTest.unit }];
+      await updateDoc(doc(db, "testCategories", newTest.categoryId), { tests: updatedTests });
+      setNewTest({ name: '', price: '', refRange: '', unit: '', categoryId: newTest.categoryId });
+      fetchCategories();
+    } catch (error) { console.error(error); }
+  };
+
+  const handleDeleteTest = async (categoryId, testId) => {
+    try {
+      const targetCategory = categories.find(c => c.id === categoryId);
+      const updatedTests = targetCategory.tests.filter(t => t.id !== testId);
+      await updateDoc(doc(db, "testCategories", categoryId), { tests: updatedTests });
+      fetchCategories();
+    } catch (error) { console.error(error); }
   };
 
   return (
-    <div className="max-w-xl mx-auto">
-      <div className="text-center mb-8">
-        <h2 className="text-2xl font-black text-gray-800">Add New Lab Test</h2>
-        <p className="text-gray-500 font-medium mt-2">Publish a new test directly to the customer booking page.</p>
-      </div>
-
-      <div className="bg-gray-50 p-8 rounded-2xl border border-gray-200 space-y-5 shadow-inner">
-        <div>
-          <label className="block text-sm font-bold text-gray-700 mb-1.5">Test Name</label>
-          <input 
-            type="text" 
-            value={testName}
-            placeholder="e.g. Complete Blood Count (CBC)" 
-            className="w-full p-4 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 font-medium outline-none shadow-sm" 
-            onChange={e => setTestName(e.target.value)} 
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-bold text-gray-700 mb-1.5">Price (₹)</label>
-          <input 
-            type="number" 
-            value={price}
-            placeholder="e.g. 350" 
-            className="w-full p-4 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 font-medium outline-none shadow-sm" 
-            onChange={e => setPrice(e.target.value)} 
-          />
+    <div className="min-h-screen bg-slate-50 p-6 font-sans text-slate-800">
+      <div className="max-w-7xl mx-auto bg-white p-6 rounded border border-slate-200 shadow-sm">
+        <div className="flex justify-between items-end border-b border-slate-200 pb-4 mb-6">
+          <h1 className="text-2xl font-semibold tracking-tight text-slate-900">System Administration</h1>
         </div>
         
-        <button 
-          onClick={handleSaveTest} 
-          disabled={isSaving}
-          className={`w-full mt-4 py-4 rounded-xl font-black text-white text-lg shadow-lg transition-transform ${
-            isSaving ? 'bg-gray-500' : 'bg-blue-600 hover:bg-blue-700 hover:-translate-y-1'
-          }`}
-        >
-          {isSaving ? "Saving..." : "Publish Test to Site"}
-        </button>
-      </div>
-    </div>
-  );
-};
+        <div className="flex gap-2 mb-6">
+          {['dashboard', 'catalog', 'promo', 'distance'].map(tab => (
+            <button key={tab} onClick={() => setActiveTab(tab)} 
+              className={`px-4 py-1.5 text-sm font-medium rounded transition-colors ${activeTab === tab ? 'bg-slate-800 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>
+              {tab === 'catalog' ? 'Test Catalog' : tab.replace('distance', 'Logistics')}
+            </button>
+          ))}
+        </div>
 
-// ==========================================
-// COMPONENT: PAST REPORTS
-// ==========================================
-const PastReportsTab = () => {
-  const [pastBookings, setPastBookings] = useState([]);
-  const [loading, setLoading] = useState(true);
+        {activeTab === 'dashboard' && (
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="bg-white p-5 rounded border border-slate-200 shadow-sm">
+              <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Total Patients</h3>
+              <p className="text-2xl font-semibold text-slate-800 mt-1">{stats.totalPatients}</p>
+            </div>
+            <div className="bg-white p-5 rounded border border-slate-200 shadow-sm">
+              <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Total Revenue</h3>
+              <p className="text-2xl font-semibold text-emerald-600 mt-1">₹{stats.totalRevenue.toLocaleString()}</p>
+            </div>
+          </div>
+        )}
 
-  useEffect(() => {
-    const fetchPast = async () => {
-      try {
-        const q = query(collection(db, "bookings"), orderBy("createdAt", "desc"));
-        const snap = await getDocs(q);
-        setPastBookings(snap.docs.map(d => ({id: d.id, ...d.data()})).filter(b => b.status === "COMPLETED"));
-      } catch(e) { console.error(e); }
-      setLoading(false);
-    };
-    fetchPast();
-  }, []);
+        {activeTab === 'catalog' && (
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="space-y-4 lg:col-span-1">
+              <div className="bg-slate-50 p-4 rounded border border-slate-200">
+                <h2 className="text-sm font-semibold mb-3">1. Add Subgroup</h2>
+                <form onSubmit={handleAddCategory} className="flex gap-2">
+                  <input type="text" placeholder="e.g. Biochemistry" className="w-full border border-slate-300 px-2 py-1.5 text-sm rounded focus:outline-none focus:border-slate-500"
+                    value={newCategoryName} onChange={e => setNewCategoryName(e.target.value)} />
+                  <button type="submit" className="bg-slate-800 text-white px-3 py-1.5 text-sm rounded hover:bg-slate-700">+</button>
+                </form>
+              </div>
 
-  return (
-    <div>
-      <h2 className="text-2xl font-black text-gray-800 mb-6 flex items-center gap-2">
-        <span className="text-blue-600">📂</span> Archive: Completed Reports
-      </h2>
-      
-      <div className="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left whitespace-nowrap">
-            <thead className="bg-gray-50 border-b border-gray-200">
-              <tr>
-                <th className="p-4 text-xs font-black text-gray-500 uppercase tracking-wider">Date</th>
-                <th className="p-4 text-xs font-black text-gray-500 uppercase tracking-wider">Patient Name</th>
-                <th className="p-4 text-xs font-black text-gray-500 uppercase tracking-wider">Tests Conducted</th>
-                <th className="p-4 text-xs font-black text-gray-500 uppercase tracking-wider">Total Paid</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {loading ? (
-                <tr><td colSpan="4" className="text-center py-8 text-gray-500">Loading records...</td></tr>
-              ) : pastBookings.length === 0 ? (
-                <tr><td colSpan="4" className="text-center py-8 text-gray-500 italic">No completed reports found.</td></tr>
-              ) : pastBookings.map((b, idx) => (
-                <tr key={idx} className="hover:bg-blue-50 transition-colors">
-                  <td className="p-4 text-sm font-medium text-gray-600">{b.date}</td>
-                  <td className="p-4 text-sm font-black text-gray-900">{b.name}</td>
-                  <td className="p-4 text-sm text-gray-600 max-w-xs truncate" title={b.cartItems?.map(i => i.name).join(", ")}>
-                    {b.cartItems?.map(i => i.name).join(", ")}
-                  </td>
-                  <td className="p-4 text-sm font-black text-green-600">₹{b.total}</td>
-                </tr>
+              <div className="bg-slate-50 p-4 rounded border border-slate-200">
+                <h2 className="text-sm font-semibold mb-3">2. Add New Test</h2>
+                <form onSubmit={handleAddTest} className="space-y-3">
+                  <div>
+                    <label className="block text-xs font-medium text-slate-600 mb-1">Subgroup</label>
+                    <select className="w-full border border-slate-300 px-2 py-1.5 text-sm rounded focus:outline-none focus:border-slate-500"
+                      value={newTest.categoryId} onChange={e => setNewTest({...newTest, categoryId: e.target.value})}>
+                      {categories.map(cat => <option key={cat.id} value={cat.id}>{cat.name}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-slate-600 mb-1">Test Name</label>
+                    <input type="text" className="w-full border border-slate-300 px-2 py-1.5 text-sm rounded"
+                      value={newTest.name} onChange={e => setNewTest({...newTest, name: e.target.value})} />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-slate-600 mb-1">Price (₹)</label>
+                    <input type="number" className="w-full border border-slate-300 px-2 py-1.5 text-sm rounded"
+                      value={newTest.price} onChange={e => setNewTest({...newTest, price: e.target.value})} />
+                  </div>
+                  <div className="flex gap-2">
+                    <div className="w-1/2">
+                      <label className="block text-xs font-medium text-slate-600 mb-1">Ref. Range</label>
+                      <input type="text" className="w-full border border-slate-300 px-2 py-1.5 text-sm rounded"
+                        value={newTest.refRange} onChange={e => setNewTest({...newTest, refRange: e.target.value})} />
+                    </div>
+                    <div className="w-1/2">
+                      <label className="block text-xs font-medium text-slate-600 mb-1">Unit</label>
+                      <input type="text" className="w-full border border-slate-300 px-2 py-1.5 text-sm rounded"
+                        value={newTest.unit} onChange={e => setNewTest({...newTest, unit: e.target.value})} />
+                    </div>
+                  </div>
+                  <button type="submit" className="w-full bg-slate-800 text-white font-medium py-1.5 text-sm rounded mt-2 hover:bg-slate-700">Add to Catalog</button>
+                </form>
+              </div>
+            </div>
+
+            <div className="lg:col-span-2 space-y-4">
+              {categories.map(cat => (
+                <div key={cat.id} className="bg-white border border-slate-200 rounded overflow-hidden">
+                  <div className="bg-slate-50 px-4 py-2 border-b border-slate-200 flex justify-between items-center">
+                    <h3 className="text-sm font-semibold text-slate-800">{cat.name}</h3>
+                    <button onClick={() => handleDeleteCategory(cat.id)} className="text-red-600 text-xs hover:underline">Delete Group</button>
+                  </div>
+                  <table className="w-full text-left text-sm">
+                    <thead className="bg-white border-b border-slate-100">
+                      <tr>
+                        <th className="px-4 py-2 text-xs font-medium text-slate-500">Test</th>
+                        <th className="px-4 py-2 text-xs font-medium text-slate-500">Price</th>
+                        <th className="px-4 py-2 text-xs font-medium text-slate-500">Range</th>
+                        <th className="px-4 py-2 text-xs font-medium text-slate-500">Unit</th>
+                        <th className="px-4 py-2 text-right"></th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {(cat.tests || []).map(test => (
+                        <tr key={test.id} className="hover:bg-slate-50">
+                          <td className="px-4 py-2">{test.name}</td>
+                          <td className="px-4 py-2">₹{test.price}</td>
+                          <td className="px-4 py-2 text-slate-500">{test.refRange || '-'}</td>
+                          <td className="px-4 py-2 text-slate-500">{test.unit || '-'}</td>
+                          <td className="px-4 py-2 text-right">
+                            <button onClick={() => handleDeleteTest(cat.id, test.id)} className="text-red-500 hover:text-red-700 text-xs">Remove</button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-  );
-};
+            </div>
+          </div>
+        )}
 
-// ==========================================
-// COMPONENT: DOCTOR COMMISSIONS
-// ==========================================
-const CommissionTab = () => {
-  const [commissions, setCommissions] = useState({});
-  const COMMISSION_RATE = 0.15; // 15%
-
-  useEffect(() => {
-    const calculateCommissions = async () => {
-      const snap = await getDocs(collection(db, "bookings"));
-      const data = {};
-      
-      snap.forEach(doc => {
-        const booking = doc.data();
-        if (booking.referredBy && booking.referredBy !== "Self") {
-          const docName = booking.referredBy;
-          if (!data[docName]) data[docName] = { revenue: 0, referrals: 0 };
-          data[docName].referrals += 1;
-          data[docName].revenue += booking.subtotal || 0;
-        }
-      });
-      setCommissions(data);
-    };
-    calculateCommissions();
-  }, []);
-
-  const totalPayout = Object.values(commissions).reduce((sum, doc) => sum + (doc.revenue * COMMISSION_RATE), 0);
-
-  return (
-    <div>
-      <div className="flex justify-between items-end mb-6">
-        <h2 className="text-2xl font-black text-gray-800 flex items-center gap-2">
-          <span className="text-green-600">💰</span> Monthly Referral Ledger
-        </h2>
-        <div className="bg-green-50 border border-green-200 px-4 py-2 rounded-xl text-right">
-          <p className="text-xs text-green-700 font-bold uppercase tracking-wider">Total Owed</p>
-          <p className="text-2xl font-black text-green-700">₹{Math.round(totalPayout)}</p>
-        </div>
-      </div>
-
-      <div className="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left whitespace-nowrap">
-            <thead className="bg-gray-50 border-b border-gray-200">
-              <tr>
-                <th className="p-4 text-xs font-black text-gray-500 uppercase tracking-wider">Referring Doctor</th>
-                <th className="p-4 text-xs font-black text-gray-500 uppercase tracking-wider text-center">Total Referrals</th>
-                <th className="p-4 text-xs font-black text-gray-500 uppercase tracking-wider text-right">Generated Revenue</th>
-                <th className="p-4 text-xs font-black text-gray-500 uppercase tracking-wider text-right">Commission (15%)</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {Object.keys(commissions).length === 0 ? (
-                <tr><td colSpan="4" className="text-center py-8 text-gray-500 italic">No doctor referrals recorded yet.</td></tr>
-              ) : Object.keys(commissions).map(docName => {
-                const payout = Math.round(commissions[docName].revenue * COMMISSION_RATE);
-                return (
-                  <tr key={docName} className="hover:bg-green-50 transition-colors">
-                    <td className="p-4 text-sm font-black text-gray-900">{docName}</td>
-                    <td className="p-4 text-sm font-medium text-gray-600 text-center">{commissions[docName].referrals}</td>
-                    <td className="p-4 text-sm font-medium text-gray-600 text-right">₹{commissions[docName].revenue}</td>
-                    <td className="p-4 text-base font-black text-green-600 text-right">₹{payout}</td>
+        {activeTab === 'promo' && (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="md:col-span-1 bg-slate-50 p-4 rounded border border-slate-200">
+              <h2 className="text-sm font-semibold mb-3">New Campaign</h2>
+              <form onSubmit={handleAddPromo} className="space-y-3">
+                <div>
+                  <label className="block text-xs font-medium text-slate-600 mb-1">Code</label>
+                  <input type="text" className="w-full border border-slate-300 px-2 py-1.5 text-sm rounded uppercase"
+                    value={newPromo.code} onChange={e => setNewPromo({...newPromo, code: e.target.value})} />
+                </div>
+                <div className="flex gap-2">
+                  <div className="w-1/2">
+                    <label className="block text-xs font-medium text-slate-600 mb-1">Value</label>
+                    <input type="number" className="w-full border border-slate-300 px-2 py-1.5 text-sm rounded"
+                      value={newPromo.discount} onChange={e => setNewPromo({...newPromo, discount: e.target.value})} />
+                  </div>
+                  <div className="w-1/2">
+                    <label className="block text-xs font-medium text-slate-600 mb-1">Type</label>
+                    <select className="w-full border border-slate-300 px-2 py-1.5 text-sm rounded"
+                      value={newPromo.type} onChange={e => setNewPromo({...newPromo, type: e.target.value})}>
+                      <option value="percentage">% Off</option>
+                      <option value="flat">Flat ₹ Off</option>
+                    </select>
+                  </div>
+                </div>
+                <button type="submit" className="w-full bg-slate-800 text-white font-medium py-1.5 text-sm rounded">Create Promo</button>
+              </form>
+            </div>
+            <div className="md:col-span-2">
+              <table className="w-full text-left border border-slate-200 rounded overflow-hidden text-sm">
+                <thead className="bg-slate-50 border-b border-slate-200">
+                  <tr>
+                    <th className="px-4 py-2 font-medium text-slate-600">Promo Code</th>
+                    <th className="px-4 py-2 font-medium text-slate-600">Discount</th>
+                    <th className="px-4 py-2 text-right"></th>
                   </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {promoCodes.map(promo => (
+                    <tr key={promo.id}>
+                      <td className="px-4 py-2 font-semibold text-slate-800">{promo.code}</td>
+                      <td className="px-4 py-2">{promo.type === 'flat' ? `₹${promo.discount}` : `${promo.discount}%`}</td>
+                      <td className="px-4 py-2 text-right">
+                        <button onClick={() => handleDeletePromo(promo.id)} className="text-red-500 text-xs">Revoke</button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'distance' && (
+          <div className="bg-slate-50 p-5 rounded border border-slate-200 max-w-xl">
+            <h2 className="text-sm font-semibold mb-4">Logistics Configuration</h2>
+            <form onSubmit={handleSaveDistanceSettings} className="space-y-4 text-sm">
+              <div className="flex justify-between items-center">
+                <label className="font-medium text-slate-700">Base Radius (km)</label>
+                <input type="number" className="border border-slate-300 px-2 py-1.5 rounded w-24 text-right"
+                  value={distanceSettings.baseDistance} onChange={e => setDistanceSettings({...distanceSettings, baseDistance: e.target.value})} />
+              </div>
+              <div className="flex justify-between items-center">
+                <label className="font-medium text-slate-700">Base Fee (₹)</label>
+                <input type="number" className="border border-slate-300 px-2 py-1.5 rounded w-24 text-right"
+                  value={distanceSettings.baseFee} onChange={e => setDistanceSettings({...distanceSettings, baseFee: e.target.value})} />
+              </div>
+              <div className="flex justify-between items-center pb-4 border-b border-slate-200">
+                <label className="font-medium text-slate-700">Overage Rate (₹/km)</label>
+                <input type="number" className="border border-slate-300 px-2 py-1.5 rounded w-24 text-right"
+                  value={distanceSettings.extraPerKm} onChange={e => setDistanceSettings({...distanceSettings, extraPerKm: e.target.value})} />
+              </div>
+              <button type="submit" className="w-full bg-slate-800 text-white font-medium py-2 rounded">Save Configuration</button>
+            </form>
+          </div>
+        )}
       </div>
     </div>
   );
