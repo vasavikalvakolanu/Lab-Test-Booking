@@ -42,7 +42,7 @@ function Admin() {
   const handleLogin = async (e) => {
     e.preventDefault();
     try { await signInWithEmailAndPassword(auth, email, password); } 
-    catch (error) { alert("Authentication failed."); }
+    catch (error) { alert("Authentication failed. Please check credentials."); }
   };
 
   const fetchData = async () => {
@@ -65,15 +65,68 @@ function Admin() {
     } catch (error) { console.error("Data fetch error:", error); }
   };
 
-  // --- PREDEFINED CATALOG SEEDING ---
+  // --- MASSIVE PREDEFINED CLINICAL CATALOG ---
   const seedPredefinedCatalog = async () => {
-    if (!window.confirm("This will load the default test catalog into the database. Continue?")) return;
+    if (!window.confirm("This will load the comprehensive diagnostic test catalog into your database. Continue?")) return;
+    
     const batch = writeBatch(db);
     const predefined = [
-      { name: "Biochemistry", tests: [ { id: "b1", name: "Fasting Blood Sugar (FBS)", price: 150, refRange: "70-100", unit: "mg/dL" }, { id: "b2", name: "Serum Creatinine", price: 200, refRange: "0.6-1.2", unit: "mg/dL" }, { id: "b3", name: "Lipid Profile", price: 600, refRange: "-", unit: "-" } ] },
-      { name: "Hematology", tests: [ { id: "h1", name: "Complete Blood Count (CBC)", price: 300, refRange: "4.5-5.5", unit: "mill/µL" }, { id: "h2", name: "Hemoglobin (Hb)", price: 150, refRange: "12-17", unit: "g/dL" } ] },
-      { name: "Immunology", tests: [ { id: "i1", name: "Thyroid Profile (T3, T4, TSH)", price: 500, refRange: "-", unit: "-" } ] },
-      { name: "Pathology", tests: [ { id: "p1", name: "Urine Routine Examination", price: 100, refRange: "-", unit: "-" } ] }
+      {
+        name: "Biochemistry",
+        tests: [
+          { id: "b1", name: "Fasting Blood Sugar (FBS)", price: 150, refRange: "70-100", unit: "mg/dL" },
+          { id: "b2", name: "Post Prandial Blood Sugar (PPBS)", price: 150, refRange: "< 140", unit: "mg/dL" },
+          { id: "b3", name: "HbA1c (Glycosylated Hemoglobin)", price: 400, refRange: "4.0-5.6", unit: "%" },
+          { id: "b4", name: "Serum Creatinine", price: 200, refRange: "0.6-1.2", unit: "mg/dL" },
+          { id: "b5", name: "Blood Urea Nitrogen (BUN)", price: 180, refRange: "7-20", unit: "mg/dL" },
+          { id: "b6", name: "Serum Uric Acid", price: 180, refRange: "3.5-7.2", unit: "mg/dL" },
+          { id: "b7", name: "Total Cholesterol", price: 200, refRange: "< 200", unit: "mg/dL" },
+          { id: "b8", name: "Triglycerides", price: 250, refRange: "< 150", unit: "mg/dL" },
+          { id: "b9", name: "HDL Cholesterol", price: 250, refRange: "> 40", unit: "mg/dL" },
+          { id: "b10", name: "LDL Cholesterol", price: 250, refRange: "< 100", unit: "mg/dL" },
+          { id: "b11", name: "SGOT (AST)", price: 180, refRange: "8-40", unit: "U/L" },
+          { id: "b12", name: "SGPT (ALT)", price: 180, refRange: "7-56", unit: "U/L" },
+          { id: "b13", name: "Alkaline Phosphatase (ALP)", price: 190, refRange: "44-147", unit: "U/L" },
+          { id: "b14", name: "Total Bilirubin", price: 200, refRange: "0.1-1.2", unit: "mg/dL" },
+          { id: "b15", name: "Serum Calcium", price: 180, refRange: "8.5-10.2", unit: "mg/dL" }
+        ]
+      },
+      {
+        name: "Hematology",
+        tests: [
+          { id: "h1", name: "Complete Blood Count (CBC)", price: 350, refRange: "Standard", unit: "-" },
+          { id: "h2", name: "Hemoglobin (Hb)", price: 150, refRange: "12.0-17.0", unit: "g/dL" },
+          { id: "h3", name: "Total WBC Count", price: 150, refRange: "4000-11000", unit: "cells/cumm" },
+          { id: "h4", name: "Platelet Count", price: 150, refRange: "1.5-4.5", unit: "lakhs/cumm" },
+          { id: "h5", name: "Erythrocyte Sedimentation Rate (ESR)", price: 120, refRange: "0-20", unit: "mm/hr" }
+        ]
+      },
+      {
+        name: "Immunology & Endocrinology",
+        tests: [
+          { id: "i1", name: "Thyroid Stimulating Hormone (TSH)", price: 300, refRange: "0.4-4.0", unit: "µIU/mL" },
+          { id: "i2", name: "Free T3", price: 250, refRange: "2.3-4.1", unit: "pg/mL" },
+          { id: "i3", name: "Free T4", price: 250, refRange: "0.9-1.7", unit: "ng/dL" },
+          { id: "i4", name: "Vitamin D (25-OH)", price: 800, refRange: "20-50", unit: "ng/mL" },
+          { id: "i5", name: "Vitamin B12", price: 700, refRange: "200-900", unit: "pg/mL" },
+          { id: "i6", name: "C-Reactive Protein (CRP)", price: 350, refRange: "< 5.0", unit: "mg/L" }
+        ]
+      },
+      {
+        name: "Serology & Infectious",
+        tests: [
+          { id: "s1", name: "Widal Test (Typhoid)", price: 250, refRange: "Negative", unit: "-" },
+          { id: "s2", name: "Dengue NS1 Antigen", price: 600, refRange: "Negative", unit: "-" },
+          { id: "s3", name: "HBsAg (Hepatitis B)", price: 300, refRange: "Negative", unit: "-" }
+        ]
+      },
+      {
+        name: "Clinical Pathology",
+        tests: [
+          { id: "p1", name: "Urine Routine & Microscopy", price: 150, refRange: "Standard", unit: "-" },
+          { id: "p2", name: "Stool Routine Examination", price: 150, refRange: "Standard", unit: "-" }
+        ]
+      }
     ];
 
     predefined.forEach(cat => {
@@ -81,9 +134,14 @@ function Admin() {
       batch.set(docRef, cat);
     });
 
-    await batch.commit();
-    fetchData();
-    alert("Catalog seeded successfully.");
+    try {
+      await batch.commit();
+      fetchData();
+      alert("Comprehensive Test Catalog imported successfully.");
+    } catch (error) {
+      console.error("Error seeding catalog: ", error);
+      alert("Error importing catalog.");
+    }
   };
 
   // --- CRUD OPERATIONS ---
@@ -96,7 +154,7 @@ function Admin() {
 
   const addTest = async (e) => {
     e.preventDefault();
-    if (!newTest.categoryId || !newTest.name) return alert("Category and Name required.");
+    if (!newTest.categoryId || !newTest.name || !newTest.price) return alert("Category, Name, and Price are required.");
     const target = categories.find(c => c.id === newTest.categoryId);
     const updated = [...(target.tests || []), { id: Date.now().toString(), name: newTest.name, price: Number(newTest.price), refRange: newTest.refRange, unit: newTest.unit }];
     await updateDoc(doc(db, "testCategories", newTest.categoryId), { tests: updated });
@@ -145,6 +203,7 @@ function Admin() {
   const liveBookings = filterData(bookings.filter(b => b.status !== "done"));
   const pastRecords = filterData(bookings.filter(b => b.status === "done"));
 
+  // --- LOGIN SCREEN ---
   if (!user) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-100 font-sans">
@@ -166,8 +225,10 @@ function Admin() {
     );
   }
 
+  // --- MAIN DASHBOARD INTERFACE ---
   return (
     <div className="min-h-screen bg-slate-50 font-sans text-slate-800 pb-10">
+      
       {/* Header & Navigation */}
       <div className="bg-white border-b border-slate-200 sticky top-0 z-10 shadow-sm">
         <div className="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
@@ -188,7 +249,7 @@ function Admin() {
             { id: 'records', label: 'Past Records' }
           ].map(tab => (
             <button key={tab.id} onClick={() => setActiveTab(tab.id)} 
-              className={`px-4 py-3 text-sm font-medium border-b-2 whitespace-nowrap ${activeTab === tab.id ? 'border-slate-800 text-slate-900' : 'border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50'}`}>
+              className={`px-4 py-3 text-sm font-medium border-b-2 whitespace-nowrap transition-colors ${activeTab === tab.id ? 'border-slate-800 text-slate-900' : 'border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50'}`}>
               {tab.label}
             </button>
           ))}
@@ -197,10 +258,10 @@ function Admin() {
 
       <div className="max-w-7xl mx-auto px-6 mt-8">
         
-        {/* Search Bar (Bookings & Records) */}
+        {/* Search Bar (Shared for Bookings & Records) */}
         {(activeTab === "bookings" || activeTab === "records") && (
           <div className="flex gap-4 mb-6 bg-white p-4 rounded border border-slate-200 shadow-sm">
-            <input type="text" placeholder="Search patient name or phone..." value={search} onChange={(e) => setSearch(e.target.value)} className="flex-1 p-2 border border-slate-300 rounded text-sm outline-none focus:border-slate-500" />
+            <input type="text" placeholder="Search patient name or phone number..." value={search} onChange={(e) => setSearch(e.target.value)} className="flex-1 p-2 border border-slate-300 rounded text-sm outline-none focus:border-slate-500" />
             <input type="date" value={selectedDate} onChange={(e) => setSelectedDate(e.target.value)} className="p-2 border border-slate-300 rounded text-sm outline-none focus:border-slate-500" />
           </div>
         )}
@@ -254,35 +315,39 @@ function Admin() {
           </div>
         )}
 
-        {/* --- TEST CATALOG --- */}
+        {/* --- TEST CATALOG WITH EMBEDDED DICTIONARY --- */}
         {activeTab === "catalog" && (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <div className="space-y-6 lg:col-span-1">
               <div className="bg-white p-5 rounded border border-slate-200 shadow-sm">
                 <div className="flex justify-between items-center mb-4">
                   <h2 className="text-sm font-semibold">1. Add Subgroup</h2>
-                  {categories.length === 0 && <button onClick={seedPredefinedCatalog} className="text-xs bg-slate-800 text-white px-2 py-1 rounded">Load Defaults</button>}
+                  {categories.length === 0 && (
+                    <button onClick={seedPredefinedCatalog} className="text-xs bg-slate-800 text-emerald-400 font-bold px-3 py-1.5 rounded hover:bg-slate-900 transition shadow-sm">
+                      Auto-Load Full Catalog
+                    </button>
+                  )}
                 </div>
                 <form onSubmit={addCategory} className="flex gap-2">
-                  <input type="text" placeholder="e.g. Biochemistry" className="w-full border border-slate-300 p-2 text-sm rounded focus:outline-none" value={newCategoryName} onChange={e => setNewCategoryName(e.target.value)} />
-                  <button type="submit" className="bg-slate-800 text-white px-4 py-2 text-sm rounded">+</button>
+                  <input type="text" placeholder="e.g. Biochemistry" className="w-full border border-slate-300 p-2 text-sm rounded focus:outline-none focus:border-slate-500" value={newCategoryName} onChange={e => setNewCategoryName(e.target.value)} />
+                  <button type="submit" className="bg-slate-800 text-white px-4 py-2 text-sm rounded hover:bg-slate-900">+</button>
                 </form>
               </div>
 
               <div className="bg-white p-5 rounded border border-slate-200 shadow-sm">
-                <h2 className="text-sm font-semibold mb-4">2. Add New Test</h2>
+                <h2 className="text-sm font-semibold mb-4">2. Add Custom Test</h2>
                 <form onSubmit={addTest} className="space-y-3">
-                  <select className="w-full border border-slate-300 p-2 text-sm rounded focus:outline-none" value={newTest.categoryId} onChange={e => setNewTest({...newTest, categoryId: e.target.value})}>
-                    <option value="">Select Subgroup</option>
+                  <select className="w-full border border-slate-300 p-2 text-sm rounded focus:outline-none focus:border-slate-500" value={newTest.categoryId} onChange={e => setNewTest({...newTest, categoryId: e.target.value})}>
+                    <option value="">Select Existing Subgroup</option>
                     {categories.map(cat => <option key={cat.id} value={cat.id}>{cat.name}</option>)}
                   </select>
-                  <input type="text" placeholder="Test Name" className="w-full border border-slate-300 p-2 text-sm rounded focus:outline-none" value={newTest.name} onChange={e => setNewTest({...newTest, name: e.target.value})} />
-                  <input type="number" placeholder="Price (₹)" className="w-full border border-slate-300 p-2 text-sm rounded focus:outline-none" value={newTest.price} onChange={e => setNewTest({...newTest, price: e.target.value})} />
+                  <input type="text" placeholder="Test Name (e.g. Vitamin C)" className="w-full border border-slate-300 p-2 text-sm rounded focus:outline-none focus:border-slate-500" value={newTest.name} onChange={e => setNewTest({...newTest, name: e.target.value})} />
+                  <input type="number" placeholder="Price (₹)" className="w-full border border-slate-300 p-2 text-sm rounded focus:outline-none focus:border-slate-500" value={newTest.price} onChange={e => setNewTest({...newTest, price: e.target.value})} />
                   <div className="flex gap-2">
-                    <input type="text" placeholder="Ref. Range" className="w-1/2 border border-slate-300 p-2 text-sm rounded focus:outline-none" value={newTest.refRange} onChange={e => setNewTest({...newTest, refRange: e.target.value})} />
-                    <input type="text" placeholder="Unit" className="w-1/2 border border-slate-300 p-2 text-sm rounded focus:outline-none" value={newTest.unit} onChange={e => setNewTest({...newTest, unit: e.target.value})} />
+                    <input type="text" placeholder="Ref. Range (e.g. 0.4-2.0)" className="w-1/2 border border-slate-300 p-2 text-sm rounded focus:outline-none focus:border-slate-500" value={newTest.refRange} onChange={e => setNewTest({...newTest, refRange: e.target.value})} />
+                    <input type="text" placeholder="Unit (e.g. mg/dL)" className="w-1/2 border border-slate-300 p-2 text-sm rounded focus:outline-none focus:border-slate-500" value={newTest.unit} onChange={e => setNewTest({...newTest, unit: e.target.value})} />
                   </div>
-                  <button type="submit" className="w-full bg-slate-800 text-white font-medium py-2 text-sm rounded mt-2">Add to Catalog</button>
+                  <button type="submit" className="w-full bg-slate-800 text-white font-medium py-2 text-sm rounded mt-2 hover:bg-slate-900 transition">Add to Catalog</button>
                 </form>
               </div>
             </div>
@@ -291,22 +356,32 @@ function Admin() {
               {categories.map(cat => (
                 <div key={cat.id} className="bg-white border border-slate-200 rounded overflow-hidden shadow-sm">
                   <div className="bg-slate-50 px-4 py-3 border-b border-slate-200 flex justify-between items-center">
-                    <h3 className="text-sm font-semibold text-slate-800">{cat.name}</h3>
-                    <button onClick={() => deleteDocItem("testCategories", cat.id)} className="text-red-500 text-xs font-medium hover:underline">Delete Group</button>
+                    <h3 className="text-sm font-bold text-slate-800">{cat.name}</h3>
+                    <button onClick={() => deleteDocItem("testCategories", cat.id)} className="text-red-500 text-xs font-medium hover:underline">Delete Entire Group</button>
                   </div>
                   <table className="w-full text-left text-sm">
                     <thead className="bg-white border-b border-slate-100">
-                      <tr><th className="px-4 py-2 font-medium text-slate-500">Test</th><th className="px-4 py-2 font-medium text-slate-500">Price</th><th className="px-4 py-2 font-medium text-slate-500">Range</th><th className="px-4 py-2 text-right"></th></tr>
+                      <tr>
+                        <th className="px-4 py-2 font-medium text-slate-500">Diagnostic Test</th>
+                        <th className="px-4 py-2 font-medium text-slate-500">Price</th>
+                        <th className="px-4 py-2 font-medium text-slate-500">Reference / Unit</th>
+                        <th className="px-4 py-2 text-right"></th>
+                      </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
                       {(cat.tests || []).map(test => (
-                        <tr key={test.id}>
-                          <td className="px-4 py-2 font-medium">{test.name}</td><td className="px-4 py-2 text-slate-600">₹{test.price}</td><td className="px-4 py-2 text-slate-500 text-xs">{test.refRange} {test.unit}</td>
+                        <tr key={test.id} className="hover:bg-slate-50 transition-colors">
+                          <td className="px-4 py-2 font-medium text-slate-800">{test.name}</td>
+                          <td className="px-4 py-2 text-slate-600 font-semibold">₹{test.price}</td>
+                          <td className="px-4 py-2 text-slate-500 text-xs">
+                            <span className="bg-slate-100 px-2 py-0.5 rounded mr-1 border border-slate-200">{test.refRange}</span>
+                            <span className="text-slate-400">{test.unit}</span>
+                          </td>
                           <td className="px-4 py-2 text-right">
                             <button onClick={async () => {
                               const updated = cat.tests.filter(t => t.id !== test.id);
                               await updateDoc(doc(db, "testCategories", cat.id), { tests: updated }); fetchData();
-                            }} className="text-red-500 text-xs">Remove</button>
+                            }} className="text-red-500 text-xs hover:text-red-700 font-medium">Remove</button>
                           </td>
                         </tr>
                       ))}
@@ -324,27 +399,27 @@ function Admin() {
              <div className="lg:col-span-1 bg-white p-5 rounded border border-slate-200 shadow-sm self-start">
                 <h3 className="text-sm font-semibold mb-4">Create Health Package</h3>
                 <div className="space-y-3">
-                  <input type="text" placeholder="Package Name" value={pkgData.name} onChange={e => setPkgData({...pkgData, name: e.target.value})} className="w-full p-2 border border-slate-300 rounded text-sm focus:outline-none" />
-                  <textarea placeholder="Tests Included (Comma Separated)" value={pkgData.includes} onChange={e => setPkgData({...pkgData, includes: e.target.value})} className="w-full p-2 border border-slate-300 rounded text-sm focus:outline-none h-20 resize-none" />
-                  <input type="number" placeholder="Total Value MRP (₹)" value={pkgData.price} onChange={e => setPkgData({...pkgData, price: e.target.value})} className="w-full p-2 border border-slate-300 rounded text-sm focus:outline-none" />
-                  <input type="number" placeholder="Offer Price (₹)" value={pkgData.discountedPrice} onChange={e => setPkgData({...pkgData, discountedPrice: e.target.value})} className="w-full p-2 border border-slate-300 rounded text-sm focus:outline-none" />
+                  <input type="text" placeholder="Package Name" value={pkgData.name} onChange={e => setPkgData({...pkgData, name: e.target.value})} className="w-full p-2 border border-slate-300 rounded text-sm focus:outline-none focus:border-slate-500" />
+                  <textarea placeholder="Tests Included (Comma Separated)" value={pkgData.includes} onChange={e => setPkgData({...pkgData, includes: e.target.value})} className="w-full p-2 border border-slate-300 rounded text-sm focus:outline-none focus:border-slate-500 h-20 resize-none" />
+                  <input type="number" placeholder="Total Value MRP (₹)" value={pkgData.price} onChange={e => setPkgData({...pkgData, price: e.target.value})} className="w-full p-2 border border-slate-300 rounded text-sm focus:outline-none focus:border-slate-500" />
+                  <input type="number" placeholder="Offer Price (₹)" value={pkgData.discountedPrice} onChange={e => setPkgData({...pkgData, discountedPrice: e.target.value})} className="w-full p-2 border border-slate-300 rounded text-sm focus:outline-none focus:border-slate-500" />
                   <label className="flex items-center text-sm text-slate-700 mt-2">
                     <input type="checkbox" checked={pkgData.allowCoupons} onChange={e => setPkgData({...pkgData, allowCoupons: e.target.checked})} className="mr-2" /> Allow Extra Coupons
                   </label>
-                  <button onClick={addPackage} className="w-full bg-slate-800 text-white font-medium py-2 rounded text-sm mt-2">Create Package</button>
+                  <button onClick={addPackage} className="w-full bg-slate-800 text-white font-medium py-2 rounded text-sm mt-2 hover:bg-slate-900">Create Package</button>
                 </div>
              </div>
              <div className="lg:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-4">
                 {packages.map(p => (
                   <div key={p.id} className="bg-white border border-slate-200 p-5 rounded shadow-sm relative">
-                    <button onClick={() => deleteDocItem("packages", p.id)} className="absolute top-4 right-4 text-xs text-red-500 font-medium">Delete</button>
+                    <button onClick={() => deleteDocItem("packages", p.id)} className="absolute top-4 right-4 text-xs text-red-500 font-medium hover:underline">Delete</button>
                     <h3 className="text-base font-semibold pr-10 mb-1">{p.name}</h3>
-                    <span className="text-xs text-slate-500 border border-slate-200 px-2 py-0.5 rounded">{p.allowCoupons ? 'Coupons Allowed' : 'No Extra Coupons'}</span>
+                    <span className="text-xs text-slate-500 border border-slate-200 px-2 py-0.5 rounded bg-slate-50">{p.allowCoupons ? 'Coupons Allowed' : 'No Extra Coupons'}</span>
                     <p className="text-xs text-slate-600 mt-3 mb-4 leading-relaxed">{p.includes}</p>
                     <div className="pt-3 border-t border-slate-100 flex items-center gap-2">
                        {p.discountedPrice ? (
-                          <><span className="line-through text-slate-400 text-sm">₹{p.price}</span><span className="font-semibold text-emerald-600 text-lg">₹{p.discountedPrice}</span></>
-                       ) : <span className="font-semibold text-slate-800 text-lg">₹{p.price}</span>}
+                          <><span className="line-through text-slate-400 text-sm">₹{p.price}</span><span className="font-bold text-emerald-600 text-lg">₹{p.discountedPrice}</span></>
+                       ) : <span className="font-bold text-slate-800 text-lg">₹{p.price}</span>}
                     </div>
                   </div>
                 ))}
@@ -358,23 +433,23 @@ function Admin() {
              <div className="lg:col-span-1 bg-white p-5 rounded border border-slate-200 shadow-sm self-start">
                 <h3 className="text-sm font-semibold mb-4">Add Referring Doctor</h3>
                 <div className="space-y-3">
-                  <input type="text" placeholder="Doctor Name (e.g. Dr. Smith)" value={referralData.doctorName} onChange={e => setReferralData({...referralData, doctorName: e.target.value})} className="w-full p-2 border border-slate-300 rounded text-sm focus:outline-none" />
-                  <input type="text" placeholder="Hospital/Clinic Name" value={referralData.hospital} onChange={e => setReferralData({...referralData, hospital: e.target.value})} className="w-full p-2 border border-slate-300 rounded text-sm focus:outline-none" />
-                  <input type="tel" placeholder="Contact Number" value={referralData.contact} onChange={e => setReferralData({...referralData, contact: e.target.value})} className="w-full p-2 border border-slate-300 rounded text-sm focus:outline-none" />
-                  <input type="text" placeholder="Commission Rate/Notes" value={referralData.commission} onChange={e => setReferralData({...referralData, commission: e.target.value})} className="w-full p-2 border border-slate-300 rounded text-sm focus:outline-none" />
-                  <button onClick={addReferral} className="w-full bg-slate-800 text-white font-medium py-2 rounded text-sm mt-2">Save Doctor</button>
+                  <input type="text" placeholder="Doctor Name (e.g. Dr. Smith)" value={referralData.doctorName} onChange={e => setReferralData({...referralData, doctorName: e.target.value})} className="w-full p-2 border border-slate-300 rounded text-sm focus:outline-none focus:border-slate-500" />
+                  <input type="text" placeholder="Hospital/Clinic Name" value={referralData.hospital} onChange={e => setReferralData({...referralData, hospital: e.target.value})} className="w-full p-2 border border-slate-300 rounded text-sm focus:outline-none focus:border-slate-500" />
+                  <input type="tel" placeholder="Contact Number" value={referralData.contact} onChange={e => setReferralData({...referralData, contact: e.target.value})} className="w-full p-2 border border-slate-300 rounded text-sm focus:outline-none focus:border-slate-500" />
+                  <input type="text" placeholder="Commission Rate/Notes" value={referralData.commission} onChange={e => setReferralData({...referralData, commission: e.target.value})} className="w-full p-2 border border-slate-300 rounded text-sm focus:outline-none focus:border-slate-500" />
+                  <button onClick={addReferral} className="w-full bg-slate-800 text-white font-medium py-2 rounded text-sm mt-2 hover:bg-slate-900">Save Doctor Ledger</button>
                 </div>
              </div>
              <div className="lg:col-span-2">
                 <table className="w-full text-left text-sm bg-white border border-slate-200 rounded shadow-sm overflow-hidden">
                   <thead className="bg-slate-50 border-b border-slate-200">
-                    <tr><th className="p-4 font-medium text-slate-600">Doctor</th><th className="p-4 font-medium text-slate-600">Hospital</th><th className="p-4 font-medium text-slate-600">Contact</th><th className="p-4 font-medium text-slate-600">Notes</th><th className="p-4 text-right"></th></tr>
+                    <tr><th className="p-4 font-medium text-slate-600">Doctor</th><th className="p-4 font-medium text-slate-600">Hospital</th><th className="p-4 font-medium text-slate-600">Contact</th><th className="p-4 font-medium text-slate-600">Ledger Notes</th><th className="p-4 text-right"></th></tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
                     {referrals.map(r => (
                       <tr key={r.id} className="hover:bg-slate-50">
-                        <td className="p-4 font-medium">{r.doctorName}</td><td className="p-4 text-slate-600">{r.hospital}</td><td className="p-4 text-slate-600">{r.contact}</td><td className="p-4 text-slate-600">{r.commission}</td>
-                        <td className="p-4 text-right"><button onClick={() => deleteDocItem("referrals", r.id)} className="text-red-500 text-xs">Remove</button></td>
+                        <td className="p-4 font-semibold text-slate-800">{r.doctorName}</td><td className="p-4 text-slate-600">{r.hospital}</td><td className="p-4 text-slate-600">{r.contact}</td><td className="p-4 text-slate-600">{r.commission}</td>
+                        <td className="p-4 text-right"><button onClick={() => deleteDocItem("referrals", r.id)} className="text-red-500 text-xs font-medium hover:underline">Remove</button></td>
                       </tr>
                     ))}
                   </tbody>
@@ -389,20 +464,20 @@ function Admin() {
             <div className="bg-white p-5 rounded border border-slate-200 shadow-sm flex flex-col md:flex-row gap-4 items-end">
               <div className="flex-1 w-full">
                 <label className="block text-xs font-medium text-slate-600 mb-1">Coupon Code (e.g. SAVE20)</label>
-                <input type="text" value={couponData.code} onChange={e => setCouponData({...couponData, code: e.target.value})} className="w-full p-2 border border-slate-300 rounded uppercase text-sm focus:outline-none" />
+                <input type="text" value={couponData.code} onChange={e => setCouponData({...couponData, code: e.target.value})} className="w-full p-2 border border-slate-300 rounded uppercase text-sm focus:outline-none focus:border-slate-500" />
               </div>
               <div className="w-full md:w-48">
                 <label className="block text-xs font-medium text-slate-600 mb-1">Discount %</label>
-                <input type="number" value={couponData.discount} onChange={e => setCouponData({...couponData, discount: e.target.value})} className="w-full p-2 border border-slate-300 rounded text-sm focus:outline-none" />
+                <input type="number" value={couponData.discount} onChange={e => setCouponData({...couponData, discount: e.target.value})} className="w-full p-2 border border-slate-300 rounded text-sm focus:outline-none focus:border-slate-500" />
               </div>
-              <button onClick={addCoupon} className="w-full md:w-auto bg-slate-800 text-white font-medium px-6 py-2 rounded text-sm">Create Coupon</button>
+              <button onClick={addCoupon} className="w-full md:w-auto bg-slate-800 text-white font-medium px-6 py-2 rounded text-sm hover:bg-slate-900">Create Promo Code</button>
             </div>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               {coupons.map(c => (
-                <div key={c.id} className="bg-white border border-slate-200 p-5 rounded shadow-sm text-center relative">
-                  <button onClick={() => deleteDocItem("coupons", c.id)} className="absolute top-2 right-2 text-slate-400 hover:text-red-500">×</button>
-                  <h3 className="text-xl font-semibold text-slate-800 tracking-wide mt-2">{c.code}</h3>
-                  <div className="mt-2 text-emerald-600 font-medium text-sm">{c.discount}% OFF</div>
+                <div key={c.id} className="bg-white border border-slate-200 p-5 rounded shadow-sm text-center relative border-t-4 border-t-emerald-500">
+                  <button onClick={() => deleteDocItem("coupons", c.id)} className="absolute top-2 right-2 text-slate-400 hover:text-red-500 text-lg leading-none">&times;</button>
+                  <h3 className="text-xl font-bold text-slate-800 tracking-wider mt-2">{c.code}</h3>
+                  <div className="mt-2 text-emerald-600 font-semibold text-sm bg-emerald-50 py-1 rounded inline-block px-3">{c.discount}% OFF</div>
                 </div>
               ))}
             </div>
@@ -415,7 +490,7 @@ function Admin() {
             <div className="bg-white p-6 rounded border border-slate-200 shadow-sm flex justify-between items-center">
               <div>
                 <h3 className="text-base font-semibold text-slate-900">Enable Paid Home Delivery</h3>
-                <p className="text-xs text-slate-500 mt-1">If OFF, distance limits are bypassed and checkout shows "FREE".</p>
+                <p className="text-xs text-slate-500 mt-1">If OFF, distance limits are bypassed and checkout shows "FREE" for all patients.</p>
               </div>
               <label className="relative inline-flex items-center cursor-pointer">
                 <input type="checkbox" className="sr-only peer" checked={settings.deliveryEnabled} onChange={e => setSettings({...settings, deliveryEnabled: e.target.checked})} />
@@ -427,13 +502,13 @@ function Admin() {
               <div className="flex justify-between items-center mb-4"><h3 className="text-sm font-semibold">Collection Centers</h3>
                 <button onClick={() => setSettings({...settings, centers: [...settings.centers, { id: Date.now(), name: "", lat: 0, lng: 0 }]})} className="text-xs text-slate-600 border border-slate-200 px-3 py-1.5 rounded hover:bg-slate-50">+ Add Center</button>
               </div>
-              <p className="text-xs text-slate-500 mb-4">Calculates delivery fee based on distance from the closest active center.</p>
+              <p className="text-xs text-slate-500 mb-4">Calculates delivery fee based on GPS distance from the closest active center to the patient.</p>
               {settings.centers.map((c, idx) => (
                 <div key={c.id} className="flex flex-wrap md:flex-nowrap gap-3 mb-3 items-end bg-slate-50 p-3 border border-slate-100 rounded">
-                  <div className="flex-1"><label className="block text-xs font-medium text-slate-500 mb-1">Branch Name</label><input type="text" value={c.name} onChange={e => { const n = [...settings.centers]; n[idx].name = e.target.value; setSettings({...settings, centers: n}); }} className="w-full p-2 border border-slate-300 rounded text-sm focus:outline-none" /></div>
-                  <div className="w-1/4"><label className="block text-xs font-medium text-slate-500 mb-1">Lat</label><input type="number" value={c.lat} onChange={e => { const n = [...settings.centers]; n[idx].lat = Number(e.target.value); setSettings({...settings, centers: n}); }} className="w-full p-2 border border-slate-300 rounded text-sm focus:outline-none" /></div>
-                  <div className="w-1/4"><label className="block text-xs font-medium text-slate-500 mb-1">Lng</label><input type="number" value={c.lng} onChange={e => { const n = [...settings.centers]; n[idx].lng = Number(e.target.value); setSettings({...settings, centers: n}); }} className="w-full p-2 border border-slate-300 rounded text-sm focus:outline-none" /></div>
-                  <button onClick={() => setSettings({...settings, centers: settings.centers.filter((_, i) => i !== idx)})} disabled={settings.centers.length === 1} className="text-red-500 p-2 text-sm disabled:opacity-30">Remove</button>
+                  <div className="flex-1"><label className="block text-xs font-medium text-slate-500 mb-1">Branch Name</label><input type="text" value={c.name} onChange={e => { const n = [...settings.centers]; n[idx].name = e.target.value; setSettings({...settings, centers: n}); }} className="w-full p-2 border border-slate-300 rounded text-sm focus:outline-none focus:border-slate-500" /></div>
+                  <div className="w-1/4"><label className="block text-xs font-medium text-slate-500 mb-1">Lat</label><input type="number" value={c.lat} onChange={e => { const n = [...settings.centers]; n[idx].lat = Number(e.target.value); setSettings({...settings, centers: n}); }} className="w-full p-2 border border-slate-300 rounded text-sm focus:outline-none focus:border-slate-500" /></div>
+                  <div className="w-1/4"><label className="block text-xs font-medium text-slate-500 mb-1">Lng</label><input type="number" value={c.lng} onChange={e => { const n = [...settings.centers]; n[idx].lng = Number(e.target.value); setSettings({...settings, centers: n}); }} className="w-full p-2 border border-slate-300 rounded text-sm focus:outline-none focus:border-slate-500" /></div>
+                  <button onClick={() => setSettings({...settings, centers: settings.centers.filter((_, i) => i !== idx)})} disabled={settings.centers.length === 1} className="text-red-500 p-2 text-sm disabled:opacity-30 font-medium">Remove</button>
                 </div>
               ))}
             </div>
@@ -443,20 +518,20 @@ function Admin() {
                 <button onClick={() => setSettings({...settings, tiers: [...settings.tiers, { id: Date.now(), upTo: 0, fee: 0 }]})} className="text-xs text-slate-600 border border-slate-200 px-3 py-1.5 rounded hover:bg-slate-50">+ Add Tier</button>
               </div>
               <div className="mb-6 flex items-center justify-between border-b border-slate-100 pb-4">
-                <div><span className="text-sm font-semibold block">Maximum Range</span><span className="text-xs text-slate-500">Block bookings beyond this distance.</span></div>
-                <div className="flex items-center"><input type="number" value={settings.maxDistance} onChange={e => setSettings({...settings, maxDistance: Number(e.target.value)})} className="w-16 p-2 border border-slate-300 rounded text-sm text-right focus:outline-none" /><span className="ml-2 text-sm font-medium text-slate-600">km</span></div>
+                <div><span className="text-sm font-semibold block">Maximum Range</span><span className="text-xs text-slate-500">Block home bookings beyond this distance.</span></div>
+                <div className="flex items-center"><input type="number" value={settings.maxDistance} onChange={e => setSettings({...settings, maxDistance: Number(e.target.value)})} className="w-16 p-2 border border-slate-300 rounded text-sm text-right focus:outline-none focus:border-slate-500" /><span className="ml-2 text-sm font-medium text-slate-600">km</span></div>
               </div>
               <div className="space-y-3">
                 {settings.tiers.sort((a,b) => a.upTo - b.upTo).map((t, idx) => (
                   <div key={t.id} className="flex items-center justify-between bg-slate-50 p-3 border border-slate-100 rounded text-sm">
-                    <div className="flex items-center"><span className="text-slate-600 mr-2 w-24">Distance up to</span><input type="number" value={t.upTo} onChange={e => { const n = [...settings.tiers]; n[idx].upTo = Number(e.target.value); setSettings({...settings, tiers: n}); }} className="w-16 p-1.5 border border-slate-300 rounded text-center focus:outline-none" /><span className="ml-2 text-slate-500">km</span></div>
-                    <div className="flex items-center"><span className="text-slate-600 mr-2">Delivery Fee ₹</span><input type="number" value={t.fee} onChange={e => { const n = [...settings.tiers]; n[idx].fee = Number(e.target.value); setSettings({...settings, tiers: n}); }} className="w-16 p-1.5 border border-slate-300 rounded text-center focus:outline-none" /></div>
-                    <button onClick={() => setSettings({...settings, tiers: settings.tiers.filter((_, i) => i !== idx)})} className="text-red-500 text-xs">Remove</button>
+                    <div className="flex items-center"><span className="text-slate-600 mr-2 w-24">Distance up to</span><input type="number" value={t.upTo} onChange={e => { const n = [...settings.tiers]; n[idx].upTo = Number(e.target.value); setSettings({...settings, tiers: n}); }} className="w-16 p-1.5 border border-slate-300 rounded text-center focus:outline-none focus:border-slate-500" /><span className="ml-2 text-slate-500">km</span></div>
+                    <div className="flex items-center"><span className="text-slate-600 mr-2">Delivery Fee ₹</span><input type="number" value={t.fee} onChange={e => { const n = [...settings.tiers]; n[idx].fee = Number(e.target.value); setSettings({...settings, tiers: n}); }} className="w-16 p-1.5 border border-slate-300 rounded text-center focus:outline-none focus:border-slate-500" /></div>
+                    <button onClick={() => setSettings({...settings, tiers: settings.tiers.filter((_, i) => i !== idx)})} className="text-red-500 text-xs font-medium">Remove</button>
                   </div>
                 ))}
               </div>
             </div>
-            <button onClick={saveSettings} className="w-full bg-slate-800 text-white font-medium py-3 rounded">Save Logistics Configuration</button>
+            <button onClick={saveSettings} className="w-full bg-slate-800 text-white font-medium py-3 rounded hover:bg-slate-900 transition">Save Logistics Configuration</button>
           </div>
         )}
 
@@ -465,15 +540,15 @@ function Admin() {
           <div className="bg-white rounded border border-slate-200 shadow-sm overflow-hidden">
             <table className="w-full text-left text-sm">
               <thead className="bg-slate-50 border-b border-slate-200">
-                <tr><th className="p-4 font-medium text-slate-600">Date</th><th className="p-4 font-medium text-slate-600">Patient</th><th className="p-4 font-medium text-slate-600">Tests</th><th className="p-4 font-medium text-slate-600">Amount Paid</th></tr>
+                <tr><th className="p-4 font-medium text-slate-600">Date</th><th className="p-4 font-medium text-slate-600">Patient Name</th><th className="p-4 font-medium text-slate-600">Tests Conducted</th><th className="p-4 font-medium text-slate-600">Amount Paid</th></tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {pastRecords.length === 0 ? <tr><td colSpan="4" className="p-8 text-center text-slate-400">No records found.</td></tr> : pastRecords.map(b => (
+                {pastRecords.length === 0 ? <tr><td colSpan="4" className="p-8 text-center text-slate-400">No completed patient records found.</td></tr> : pastRecords.map(b => (
                   <tr key={b.id} className="hover:bg-slate-50">
-                    <td className="p-4 text-slate-500">{b.date}</td>
-                    <td className="p-4 font-medium">{b.name}</td>
-                    <td className="p-4 text-slate-600 max-w-xs truncate">{(b.cartItems || b.tests || []).map(i => i.name).join(", ")}</td>
-                    <td className="p-4 font-medium">₹{b.total}</td>
+                    <td className="p-4 text-slate-500 whitespace-nowrap">{b.date}</td>
+                    <td className="p-4 font-medium text-slate-800">{b.name}</td>
+                    <td className="p-4 text-slate-600 max-w-md truncate">{(b.cartItems || b.tests || []).map(i => i.name).join(", ")}</td>
+                    <td className="p-4 font-bold text-slate-800">₹{b.total}</td>
                   </tr>
                 ))}
               </tbody>
@@ -486,4 +561,4 @@ function Admin() {
   );
 }
 
-export default Admin; 
+export default Admin;
