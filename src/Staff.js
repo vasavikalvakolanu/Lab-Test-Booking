@@ -1,222 +1,344 @@
-import React, { useState, useEffect } from "react";
-import { db } from "./firebase";
-import { collection, getDocs, updateDoc, doc, query, orderBy } from "firebase/firestore";
-import jsPDF from "jspdf";
-import "jspdf-autotable";
+import React, { useState, useEffect } from 'react';
+import { db } from './firebase';
+import { collection, addDoc, getDocs, updateDoc, doc } from 'firebase/firestore';
+import jsPDF from 'jspdf';
+import 'jspdf-autotable';
 
-function Staff() {
-  const [bookings, setBookings] = useState([]);
-  const [selectedBooking, setSelectedBooking] = useState(null);
-  const [resultsData, setResultsData] = useState({});
-  const [isLoading, setIsLoading] = useState(true);
+// Pre-defined test catalog mapped by subgroups
+const TEST_CATALOG = {
+  "Biochemistry": [
+    { id: 'b1', name: 'Fasting Blood Sugar (FBS)', price: 150, refRange: '70-100 mg/dL' },
+    { id: 'b2', name: 'Serum Creatinine', price: 200, refRange: '0.6-1.2 mg/dL' },
+    { id: 'b3', name: 'Lipid Profile', price: 600, refRange: 'Varies' }
+  ],
+  "Hematology": [
+    { id: 'h1', name: 'Complete Blood Count (CBC)', price: 300, refRange: 'Standard' },
+    { id: 'h2', name: 'Hemoglobin (Hb)', price: 150, refRange: '12-17 g/dL' }
+  ],
+  "Immunology": [
+    { id: 'i1', name: 'Thyroid Profile (T3, T4, TSH)', price: 500, refRange: 'Varies' }
+  ]
+};
 
+const Staff = () => {
+  const [activeTab, setActiveTab] = useState('new'); // 'new' or 'history'
+  
+  // New Patient State
+  const [patient, setPatient] = useState({ name: '', age: '', phone: '', gender: 'Male' });
+  const [selectedCategory, setSelectedCategory] = useState('Biochemistry');
+  const [selectedTests, setSelectedTests] = useState([]);
+  
+  // History & Reports State
+  const [records, setRecords] = useState([]);
+  const [editingRecord, setEditingRecord] = useState(null);
+
+  // Fetch past records on load
   useEffect(() => {
-    fetchBookings();
-  }, []);
+    if (activeTab === 'history') fetchRecords();
+  }, [activeTab]);
 
-  const fetchBookings = async () => {
-    setIsLoading(true);
+  const fetchRecords = async () => {
+    const querySnapshot = await getDocs(collection(db, "patients"));
+    const data = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    setRecords(data);
+  };
+
+  // --- NEW PATIENT & BILLING ---
+
+  const handleTestSelection = (test) => {
+    const isSelected = selectedTests.find(t => t.id === test.id);
+    if (isSelected) {
+      setSelectedTests(selectedTests.filter(t => t.id !== test.id));
+    } else {
+      // Add test with an empty result field for later reporting
+      setSelectedTests([...selectedTests, { ...test, result: '' }]);
+    }
+  };
+
+  const calculateTotal = () => selectedTests.reduce((sum, test) => sum + test.price, 0);
+
+  const savePatientAndGenerateBill = async () => {
+    if (!patient.name || selectedTests.length === 0) {
+      alert("Please enter patient details and select at least one test.");
+      return;
+    }
+
+    const newRecord = {
+      ...patient,
+      tests: selectedTests,
+      totalAmount: calculateTotal(),
+      date: new Date().toISOString(),
+      status: 'Pending Results'
+    };
+
     try {
-      const q = query(collection(db, "bookings"), orderBy("createdAt", "desc"));
-      const snap = await getDocs(q);
-      setBookings(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-    } catch (err) {
-      console.error("Error fetching bookings:", err);
-    }
-    setIsLoading(false);
-  };
-
-  const updateStatus = async (id, newStatus) => {
-    await updateDoc(doc(db, "bookings", id), { status: newStatus });
-    fetchBookings(); 
-    if (selectedBooking?.id === id) {
-      setSelectedBooking(null); // Clear selection after completion
+      await addDoc(collection(db, "patients"), newRecord);
+      generateBillPDF(newRecord);
+      // Reset form
+      setPatient({ name: '', age: '', phone: '', gender: 'Male' });
+      setSelectedTests([]);
+      alert("Patient registered and Bill generated successfully!");
+    } catch (error) {
+      console.error("Error saving patient:", error);
+      alert("Failed to save patient record.");
     }
   };
 
-  const generatePDFReport = (booking) => {
+  const generateBillPDF = (data) => {
     const doc = new jsPDF();
+    doc.setFontSize(20);
+    doc.text("Balaji Labs - Invoice", 14, 22);
     
-    // Header styling
-    doc.setFontSize(22);
-    doc.setTextColor(30, 58, 138); // Blue-900
-    doc.text("SRI BALAJI DIAGNOSTICS", 14, 20);
-    
-    doc.setFontSize(14);
-    doc.setTextColor(100, 100, 100);
-    doc.text("CLINICAL LABORATORY REPORT", 14, 28);
-    
-    doc.setFontSize(11);
-    doc.setTextColor(0, 0, 0);
-    doc.text(`Patient Name: ${booking.name}`, 14, 40);
-    doc.text(`Phone: ${booking.phone}`, 14, 46);
-    doc.text(`Date: ${booking.date}`, 14, 52);
-    doc.text(`Ref By: ${booking.referredBy || 'Self'}`, 14, 58);
+    doc.setFontSize(12);
+    doc.text(`Patient Name: ${data.name}`, 14, 35);
+    doc.text(`Age/Gender: ${data.age} / ${data.gender}`, 14, 42);
+    doc.text(`Date: ${new Date(data.date).toLocaleDateString()}`, 14, 49);
 
-    const tableRows = Object.keys(resultsData).map(testParam => [
-      testParam, 
-      resultsData[testParam].value || "-", 
-      resultsData[testParam].unit || "", 
-      resultsData[testParam].range || ""
+    const tableColumn = ["Test Name", "Category", "Price (Rs)"];
+    const tableRows = data.tests.map(test => [
+      test.name, 
+      Object.keys(TEST_CATALOG).find(cat => TEST_CATALOG[cat].some(t => t.id === test.id)), 
+      test.price
     ]);
 
     doc.autoTable({
-      startY: 65,
-      head: [['Test Parameter', 'Observed Value', 'Unit', 'Biological Ref. Range']],
+      startY: 55,
+      head: [tableColumn],
       body: tableRows,
-      headStyles: { fillColor: [30, 58, 138] },
-      didParseCell: function (data) {
-        if (data.section === 'body' && data.column.index === 1) {
-            data.cell.styles.fontStyle = 'bold'; 
-        }
-      }
     });
 
-    doc.save(`${booking.name.replace(/\s+/g, '_')}_Report.pdf`);
-    updateStatus(booking.id, "COMPLETED");
+    doc.text(`Total Amount: Rs ${data.totalAmount}`, 14, doc.lastAutoTable.finalY + 10);
+    doc.save(`${data.name}_Bill.pdf`);
+  };
+
+  // --- EDITING & REPORTS ---
+
+  const handleResultChange = (testId, value) => {
+    const updatedTests = editingRecord.tests.map(t => 
+      t.id === testId ? { ...t, result: value } : t
+    );
+    setEditingRecord({ ...editingRecord, tests: updatedTests });
+  };
+
+  const saveUpdatedReport = async () => {
+    try {
+      const recordRef = doc(db, "patients", editingRecord.id);
+      await updateDoc(recordRef, {
+        tests: editingRecord.tests,
+        status: 'Completed'
+      });
+      setEditingRecord(null);
+      fetchRecords();
+      alert("Report updated successfully!");
+    } catch (error) {
+      console.error("Error updating report:", error);
+    }
+  };
+
+  const generateReportPDF = (data) => {
+    const doc = new jsPDF();
+    doc.setFontSize(20);
+    doc.text("Balaji Labs - Test Report", 14, 22);
+    
+    doc.setFontSize(12);
+    doc.text(`Patient Name: ${data.name}`, 14, 35);
+    doc.text(`Age/Gender: ${data.age} / ${data.gender}`, 14, 42);
+    doc.text(`Date: ${new Date(data.date).toLocaleDateString()}`, 14, 49);
+
+    const tableColumn = ["Test Name", "Result", "Reference Range"];
+    const tableRows = data.tests.map(test => [
+      test.name, 
+      test.result || 'Pending', 
+      test.refRange
+    ]);
+
+    doc.autoTable({
+      startY: 55,
+      head: [tableColumn],
+      body: tableRows,
+    });
+
+    doc.save(`${data.name}_Medical_Report.pdf`);
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8 px-4 font-sans">
-      <div className="max-w-7xl mx-auto">
+    <div className="min-h-screen bg-gray-50 p-8">
+      <div className="max-w-6xl mx-auto bg-white p-6 rounded-lg shadow">
+        <h1 className="text-3xl font-bold text-gray-800 mb-6">Staff Dashboard</h1>
         
-        {/* HEADER */}
-        <header className="mb-8 bg-white p-6 rounded-2xl shadow-sm border border-gray-100 relative overflow-hidden flex justify-between items-center">
-          <div className="absolute top-0 left-0 w-full h-2 bg-blue-600"></div>
-          <div>
-            <h1 className="text-3xl font-extrabold text-blue-900 mt-2 tracking-tight">Staff Portal</h1>
-            <p className="text-gray-600 font-medium mt-1">Manage sample collections and generate reports.</p>
-          </div>
-          <button onClick={fetchBookings} className="bg-blue-50 text-blue-700 px-4 py-2 rounded-xl font-bold border border-blue-200 hover:bg-blue-100 transition">
-            🔄 Refresh List
+        <div className="flex space-x-4 mb-8 border-b pb-4">
+          <button 
+            onClick={() => setActiveTab('new')} 
+            className={`px-4 py-2 font-semibold rounded ${activeTab === 'new' ? 'bg-blue-600 text-white' : 'bg-gray-200'}`}
+          >
+            New Patient Registration
           </button>
-        </header>
-
-        <div className="flex flex-col lg:flex-row gap-8">
-          {/* ================= LEFT SIDE: ORDER MANAGEMENT ================= */}
-          <div className="flex-1 bg-white p-6 md:p-8 rounded-2xl shadow-md border border-gray-100 h-fit">
-            <h2 className="text-2xl font-bold text-gray-800 mb-6 flex items-center gap-2">
-              📋 Active Appointments
-            </h2>
-
-            <div className="space-y-4 max-h-[700px] overflow-y-auto pr-2 custom-scrollbar">
-              {isLoading ? (
-                <p className="text-center text-gray-500 py-8 font-medium">Loading appointments...</p>
-              ) : bookings.filter(b => b.status !== "COMPLETED").length === 0 ? (
-                <div className="text-center py-12 bg-gray-50 rounded-xl border-2 border-dashed border-gray-200">
-                  <p className="text-4xl mb-3">✅</p>
-                  <p className="text-gray-500 font-bold">All caught up! No pending tests.</p>
-                </div>
-              ) : bookings.filter(b => b.status !== "COMPLETED").map(b => (
-                <div key={b.id} className="p-5 rounded-xl border-2 border-gray-100 hover:border-blue-300 transition-all shadow-sm bg-white group">
-                  <div className="flex justify-between items-start mb-3">
-                    <div>
-                      <h3 className="font-bold text-lg text-gray-900">{b.name}</h3>
-                      <p className="text-sm text-gray-500 font-medium">ID: {b.id.slice(0, 6).toUpperCase()} • {b.date} • {b.timeSlot}</p>
-                    </div>
-                    <span className={`px-3 py-1 text-xs font-black rounded-full uppercase tracking-wider ${
-                      b.status === 'SAMPLE_COLLECTED' ? 'bg-purple-100 text-purple-700 border border-purple-200' : 'bg-yellow-100 text-yellow-700 border border-yellow-200'
-                    }`}>
-                      {b.status === 'pending' ? 'Pending' : 'Collected'}
-                    </span>
-                  </div>
-                  
-                  <div className="mb-4 bg-gray-50 p-3 rounded-lg border border-gray-100">
-                    <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1.5">Tests Booked</p>
-                    <div className="flex flex-wrap gap-1.5">
-                      {b.cartItems?.map((item, idx) => (
-                        <span key={idx} className="bg-white text-gray-700 text-[11px] font-bold px-2 py-1 rounded border shadow-sm">
-                          {item.name}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                  
-                  <div className="flex gap-3">
-                    {b.status === 'pending' && (
-                      <button onClick={() => updateStatus(b.id, "SAMPLE_COLLECTED")} className="flex-1 bg-white border-2 border-blue-600 text-blue-700 py-2.5 rounded-xl font-bold hover:bg-blue-50 transition shadow-sm">
-                        💉 Mark Sample Collected
-                      </button>
-                    )}
-                    {b.status === 'SAMPLE_COLLECTED' && (
-                      <button onClick={() => setSelectedBooking(b)} className="flex-1 bg-green-600 text-white py-2.5 rounded-xl font-bold hover:bg-green-700 transition shadow-sm">
-                        🧪 Enter Lab Results
-                      </button>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* ================= RIGHT SIDE: REPORT ENTRY ================= */}
-          <div className="w-full lg:w-[500px]">
-            <div className="bg-white p-6 md:p-8 rounded-2xl shadow-md border border-gray-100 sticky top-8">
-              {!selectedBooking ? (
-                <div className="text-center py-16 opacity-50">
-                  <span className="text-6xl block mb-4">📄</span>
-                  <p className="font-bold text-gray-500 text-lg">Select a collected sample<br/>to enter results.</p>
-                </div>
-              ) : (
-                <>
-                  <h2 className="text-2xl font-bold text-gray-800 mb-6 border-b border-gray-100 pb-4">
-                    Report Generation
-                  </h2>
-                  
-                  <div className="mb-6 bg-blue-50 p-5 rounded-xl border border-blue-100">
-                    <h3 className="font-black text-blue-900 text-lg mb-1">{selectedBooking.name}</h3>
-                    <p className="text-sm text-blue-700 font-medium">Ref By: {selectedBooking.referredBy || 'Self'}</p>
-                    <div className="mt-3 pt-3 border-t border-blue-200 flex justify-between items-center">
-                       <span className="text-sm font-bold text-blue-800">Total Bill Paid: ₹{selectedBooking.total}</span>
-                       <button onClick={() => alert("Printing Bill functionality can be connected to thermal printer.")} className="text-xs bg-white text-blue-700 px-3 py-1.5 rounded-md font-bold shadow-sm border border-blue-200">
-                         Print Receipt
-                       </button>
-                    </div>
-                  </div>
-
-                  <h3 className="text-sm font-bold text-gray-700 mb-3 uppercase tracking-wider">
-                    Enter Clinical Values
-                  </h3>
-                  
-                  <div className="space-y-4 mb-8">
-                    {/* Placeholder for dynamic parameters based on selected tests */}
-                    <div className="p-4 rounded-xl border border-gray-200 bg-gray-50">
-                      <label className="block text-sm font-bold text-gray-900 mb-2">Hemoglobin (Hb)</label>
-                      <div className="flex gap-2">
-                        <input 
-                          type="text" 
-                          className="flex-1 p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 font-medium outline-none" 
-                          placeholder="Observed Value" 
-                          onChange={(e) => setResultsData({
-                            ...resultsData, 
-                            "Hemoglobin": {value: e.target.value, unit: "g/dL", range: "13.8 - 17.2"}
-                          })} 
-                        />
-                        <div className="bg-gray-200 px-4 py-3 rounded-lg text-sm text-gray-600 font-medium flex items-center">
-                          g/dL
-                        </div>
-                      </div>
-                      <p className="text-xs text-gray-500 mt-2 font-medium">Normal Range: 13.8 - 17.2</p>
-                    </div>
-                  </div>
-                  
-                  <button 
-                    onClick={() => generatePDFReport(selectedBooking)} 
-                    className="w-full bg-green-600 hover:bg-green-700 text-white py-4 rounded-xl font-black text-lg shadow-lg transition-transform hover:-translate-y-1 flex justify-center items-center gap-2"
-                  >
-                    <span>📄</span> Generate & Export PDF Report
-                  </button>
-                  <button onClick={() => setSelectedBooking(null)} className="w-full text-center mt-4 text-sm text-gray-500 font-bold hover:text-gray-700">
-                    Cancel
-                  </button>
-                </>
-              )}
-            </div>
-          </div>
+          <button 
+            onClick={() => setActiveTab('history')} 
+            className={`px-4 py-2 font-semibold rounded ${activeTab === 'history' ? 'bg-blue-600 text-white' : 'bg-gray-200'}`}
+          >
+            Manage Reports
+          </button>
         </div>
+
+        {/* TAB 1: NEW PATIENT & BILLING */}
+        {activeTab === 'new' && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            {/* Patient Form */}
+            <div>
+              <h2 className="text-xl font-bold mb-4">1. Patient Details</h2>
+              <div className="space-y-4">
+                <input type="text" placeholder="Full Name" className="w-full border p-2 rounded" 
+                  value={patient.name} onChange={e => setPatient({...patient, name: e.target.value})} />
+                <div className="flex space-x-4">
+                  <input type="number" placeholder="Age" className="w-1/2 border p-2 rounded" 
+                    value={patient.age} onChange={e => setPatient({...patient, age: e.target.value})} />
+                  <select className="w-1/2 border p-2 rounded" 
+                    value={patient.gender} onChange={e => setPatient({...patient, gender: e.target.value})}>
+                    <option>Male</option>
+                    <option>Female</option>
+                    <option>Other</option>
+                  </select>
+                </div>
+                <input type="tel" placeholder="Phone Number" className="w-full border p-2 rounded" 
+                  value={patient.phone} onChange={e => setPatient({...patient, phone: e.target.value})} />
+              </div>
+
+              <h2 className="text-xl font-bold mt-8 mb-4">2. Select Subgroup</h2>
+              <select 
+                className="w-full border p-2 rounded mb-4"
+                value={selectedCategory} 
+                onChange={(e) => setSelectedCategory(e.target.value)}
+              >
+                {Object.keys(TEST_CATALOG).map(cat => (
+                  <option key={cat} value={cat}>{cat}</option>
+                ))}
+              </select>
+
+              <div className="bg-gray-50 p-4 border rounded">
+                {TEST_CATALOG[selectedCategory].map(test => (
+                  <label key={test.id} className="flex items-center space-x-3 mb-2 cursor-pointer">
+                    <input 
+                      type="checkbox" 
+                      checked={!!selectedTests.find(t => t.id === test.id)}
+                      onChange={() => handleTestSelection(test)}
+                      className="form-checkbox h-5 w-5 text-blue-600"
+                    />
+                    <span>{test.name} - Rs {test.price}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            {/* Bill Summary */}
+            <div className="bg-blue-50 p-6 rounded-lg border border-blue-100">
+              <h2 className="text-xl font-bold mb-4">Bill Summary</h2>
+              {selectedTests.length === 0 ? (
+                <p className="text-gray-500">No tests selected yet.</p>
+              ) : (
+                <ul className="mb-4 space-y-2">
+                  {selectedTests.map(test => (
+                    <li key={test.id} className="flex justify-between border-b border-blue-200 pb-1">
+                      <span>{test.name}</span>
+                      <span className="font-semibold">Rs {test.price}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              <div className="text-xl font-bold border-t border-blue-300 pt-4 flex justify-between">
+                <span>Total:</span>
+                <span>Rs {calculateTotal()}</span>
+              </div>
+              <button 
+                onClick={savePatientAndGenerateBill}
+                className="w-full bg-blue-600 text-white font-bold py-3 px-4 rounded mt-6 hover:bg-blue-700"
+              >
+                Save Patient & Generate Bill PDF
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* TAB 2: MANAGE REPORTS */}
+        {activeTab === 'history' && (
+          <div>
+            {editingRecord ? (
+              <div className="bg-yellow-50 p-6 rounded border border-yellow-200">
+                <div className="flex justify-between items-center mb-4">
+                  <h2 className="text-xl font-bold">Editing Results for {editingRecord.name}</h2>
+                  <button onClick={() => setEditingRecord(null)} className="text-red-500 font-bold">Cancel</button>
+                </div>
+                
+                {editingRecord.tests.map(test => (
+                  <div key={test.id} className="mb-4 flex items-center justify-between bg-white p-3 border rounded">
+                    <div className="w-1/3 font-semibold">{test.name}</div>
+                    <div className="w-1/3 text-sm text-gray-500">Ref: {test.refRange}</div>
+                    <input 
+                      type="text" 
+                      placeholder="Enter Result"
+                      value={test.result || ''}
+                      onChange={(e) => handleResultChange(test.id, e.target.value)}
+                      className="w-1/3 border p-2 rounded"
+                    />
+                  </div>
+                ))}
+                
+                <button 
+                  onClick={saveUpdatedReport}
+                  className="bg-green-600 text-white font-bold py-2 px-6 rounded mt-4"
+                >
+                  Save Results
+                </button>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="bg-gray-100 border-b">
+                      <th className="p-3">Date</th>
+                      <th className="p-3">Patient Name</th>
+                      <th className="p-3">Status</th>
+                      <th className="p-3">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {records.map(record => (
+                      <tr key={record.id} className="border-b hover:bg-gray-50">
+                        <td className="p-3">{new Date(record.date).toLocaleDateString()}</td>
+                        <td className="p-3 font-semibold">{record.name}</td>
+                        <td className="p-3">
+                          <span className={`px-2 py-1 rounded text-sm ${record.status === 'Completed' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}`}>
+                            {record.status}
+                          </span>
+                        </td>
+                        <td className="p-3 flex space-x-2">
+                          <button 
+                            onClick={() => setEditingRecord(record)}
+                            className="bg-yellow-500 text-white px-3 py-1 rounded text-sm"
+                          >
+                            Edit Results
+                          </button>
+                          <button 
+                            onClick={() => generateReportPDF(record)}
+                            className="bg-blue-600 text-white px-3 py-1 rounded text-sm"
+                          >
+                            Download PDF
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                    {records.length === 0 && (
+                      <tr><td colSpan="4" className="p-4 text-center text-gray-500">No records found.</td></tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
-}
+};
 
 export default Staff;
