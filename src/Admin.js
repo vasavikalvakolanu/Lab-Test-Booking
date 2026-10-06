@@ -65,66 +65,126 @@ function Admin() {
     } catch (error) { console.error("Data fetch error:", error); }
   };
 
-  // --- MASSIVE PREDEFINED CLINICAL CATALOG ---
+  // --- PREDEFINED CATALOG FROM BALAJI LABS EXCEL SHEET ---
   const seedPredefinedCatalog = async () => {
-    if (!window.confirm("This will load the comprehensive diagnostic test catalog into your database. Continue?")) return;
+    if (!window.confirm("This will load the Sri Balaji Clinical Laboratory Excel catalog into your database. Continue?")) return;
     
     const batch = writeBatch(db);
     const predefined = [
       {
-        name: "Biochemistry",
-        tests: [
-          { id: "b1", name: "Fasting Blood Sugar (FBS)", price: 150, refRange: "70-100", unit: "mg/dL" },
-          { id: "b2", name: "Post Prandial Blood Sugar (PPBS)", price: 150, refRange: "< 140", unit: "mg/dL" },
-          { id: "b3", name: "HbA1c (Glycosylated Hemoglobin)", price: 400, refRange: "4.0-5.6", unit: "%" },
-          { id: "b4", name: "Serum Creatinine", price: 200, refRange: "0.6-1.2", unit: "mg/dL" },
-          { id: "b5", name: "Blood Urea Nitrogen (BUN)", price: 180, refRange: "7-20", unit: "mg/dL" },
-          { id: "b6", name: "Serum Uric Acid", price: 180, refRange: "3.5-7.2", unit: "mg/dL" },
-          { id: "b7", name: "Total Cholesterol", price: 200, refRange: "< 200", unit: "mg/dL" },
-          { id: "b8", name: "Triglycerides", price: 250, refRange: "< 150", unit: "mg/dL" },
-          { id: "b9", name: "HDL Cholesterol", price: 250, refRange: "> 40", unit: "mg/dL" },
-          { id: "b10", name: "LDL Cholesterol", price: 250, refRange: "< 100", unit: "mg/dL" },
-          { id: "b11", name: "SGOT (AST)", price: 180, refRange: "8-40", unit: "U/L" },
-          { id: "b12", name: "SGPT (ALT)", price: 180, refRange: "7-56", unit: "U/L" },
-          { id: "b13", name: "Alkaline Phosphatase (ALP)", price: 190, refRange: "44-147", unit: "U/L" },
-          { id: "b14", name: "Total Bilirubin", price: 200, refRange: "0.1-1.2", unit: "mg/dL" },
-          { id: "b15", name: "Serum Calcium", price: 180, refRange: "8.5-10.2", unit: "mg/dL" }
+        "name": "Haematology",
+        "tests": [
+          { "id": "t1", "name": "Haematology (Hb)", "price": 100, "refRange": "Men 13.5-16; Women 11.5-15", "unit": "g/dL" },
+          { "id": "t2", "name": "Total Count of WBC", "price": 300, "refRange": "5,000-10,000", "unit": "/µL" },
+          { "id": "t3", "name": "Differential Count of WBC", "price": 300, "refRange": "-", "unit": "%" },
+          { "id": "t4", "name": "Polymorphs (Neutrophils)", "price": 300, "refRange": "-", "unit": "%" },
+          { "id": "t5", "name": "Lymphocytes", "price": 300, "refRange": "45-70", "unit": "%" },
+          { "id": "t6", "name": "Eosinophils", "price": 300, "refRange": "25-35", "unit": "%" },
+          { "id": "t7", "name": "Monocytes", "price": 300, "refRange": "0-4", "unit": "%" },
+          { "id": "t8", "name": "Basophils", "price": 300, "refRange": "0-2", "unit": "%" },
+          { "id": "t9", "name": "ESR (Wintrobe's Method)", "price": 100, "refRange": "-", "unit": "mm/hr" },
+          { "id": "t10", "name": "Platelet Count", "price": 300, "refRange": "1.5-4.0", "unit": "lakh/µL" },
+          { "id": "t11", "name": "Haematocrit (P.C.V.)", "price": 300, "refRange": "35-47", "unit": "%" },
+          { "id": "t12", "name": "Bleeding Time", "price": 200, "refRange": "1-30", "unit": "min" },
+          { "id": "t13", "name": "Clotting Time", "price": 200, "refRange": "3-7", "unit": "min" },
+          { "id": "t14", "name": "Smear for M.P./M.F.", "price": 0, "refRange": "-", "unit": "-" }
         ]
       },
       {
-        name: "Hematology",
-        tests: [
-          { id: "h1", name: "Complete Blood Count (CBC)", price: 350, refRange: "Standard", unit: "-" },
-          { id: "h2", name: "Hemoglobin (Hb)", price: 150, refRange: "12.0-17.0", unit: "g/dL" },
-          { id: "h3", name: "Total WBC Count", price: 150, refRange: "4000-11000", unit: "cells/cumm" },
-          { id: "h4", name: "Platelet Count", price: 150, refRange: "1.5-4.5", unit: "lakhs/cumm" },
-          { id: "h5", name: "Erythrocyte Sedimentation Rate (ESR)", price: 120, refRange: "0-20", unit: "mm/hr" }
+        "name": "Bio-Chemistry",
+        "tests": [
+          { "id": "t15", "name": "Sugar (Fasting)", "price": 50, "refRange": "70-110", "unit": "mg/dL" },
+          { "id": "t16", "name": "Sugar (P.P.)", "price": 50, "refRange": "110-170", "unit": "mg/dL" },
+          { "id": "t17", "name": "Sugar (Random)", "price": 50, "refRange": "70-140", "unit": "mg/dL" },
+          { "id": "t18", "name": "Urea", "price": 150, "refRange": "15-40", "unit": "mg/dL" },
+          { "id": "t19", "name": "Creatinine", "price": 150, "refRange": "0.9-1.4", "unit": "mg/dL" },
+          { "id": "t20", "name": "Total Cholesterol", "price": 150, "refRange": "150-250", "unit": "mg/dL" },
+          { "id": "t21", "name": "L.F.T. Vanden Berg's Reaction", "price": 850, "refRange": "Negative (-ve); Positive (+ve)", "unit": "-" },
+          { "id": "t22", "name": "Total Bilirubin", "price": 850, "refRange": "0.2-1.0", "unit": "mg/dL" },
+          { "id": "t23", "name": "Direct Bilirubin", "price": 850, "refRange": "-", "unit": "mg/dL" },
+          { "id": "t24", "name": "In-direct Bilirubin", "price": 850, "refRange": "-", "unit": "mg/dL" },
+          { "id": "t25", "name": "S.G.P.T.", "price": 850, "refRange": "5-40", "unit": "U/L" },
+          { "id": "t26", "name": "S.G.O.T.", "price": 850, "refRange": "5-40", "unit": "U/L" },
+          { "id": "t27", "name": "Alkaline phosphatase", "price": 350, "refRange": "40-129 (men); 35-104 (women)", "unit": "U/L" },
+          { "id": "t28", "name": "Serum Calcium", "price": 200, "refRange": "8.5-11.0", "unit": "mg/dL" },
+          { "id": "t29", "name": "Uric Acid", "price": 200, "refRange": "3.0-3.60", "unit": "mg/dL" }
         ]
       },
       {
-        name: "Immunology & Endocrinology",
-        tests: [
-          { id: "i1", name: "Thyroid Stimulating Hormone (TSH)", price: 300, refRange: "0.4-4.0", unit: "µIU/mL" },
-          { id: "i2", name: "Free T3", price: 250, refRange: "2.3-4.1", unit: "pg/mL" },
-          { id: "i3", name: "Free T4", price: 250, refRange: "0.9-1.7", unit: "ng/dL" },
-          { id: "i4", name: "Vitamin D (25-OH)", price: 800, refRange: "20-50", unit: "ng/mL" },
-          { id: "i5", name: "Vitamin B12", price: 700, refRange: "200-900", unit: "pg/mL" },
-          { id: "i6", name: "C-Reactive Protein (CRP)", price: 350, refRange: "< 5.0", unit: "mg/L" }
+        "name": "Lipid Profile",
+        "tests": [
+          { "id": "t30", "name": "Total Cholesterol", "price": 450, "refRange": "Up to 200", "unit": "mg/dL" },
+          { "id": "t31", "name": "H.D.L.", "price": 450, "refRange": "50-80", "unit": "mg/dL" },
+          { "id": "t32", "name": "L.D.L.", "price": 450, "refRange": "80-130", "unit": "mg/dL" },
+          { "id": "t33", "name": "V.L.D.L.", "price": 450, "refRange": "5-40", "unit": "mg/dL" },
+          { "id": "t34", "name": "Triglycerides", "price": 450, "refRange": "Up to 200", "unit": "mg/dL" }
         ]
       },
       {
-        name: "Serology & Infectious",
-        tests: [
-          { id: "s1", name: "Widal Test (Typhoid)", price: 250, refRange: "Negative", unit: "-" },
-          { id: "s2", name: "Dengue NS1 Antigen", price: 600, refRange: "Negative", unit: "-" },
-          { id: "s3", name: "HBsAg (Hepatitis B)", price: 300, refRange: "Negative", unit: "-" }
+        "name": "Electrolytes",
+        "tests": [
+          { "id": "t35", "name": "Sodium (Na+)", "price": 400, "refRange": "135-155", "unit": "mEq/L" },
+          { "id": "t36", "name": "Potassium (K+)", "price": 400, "refRange": "3.5-5.5", "unit": "mEq/L" },
+          { "id": "t37", "name": "Chlorides (Chrl)", "price": 400, "refRange": "97-106", "unit": "mEq/L" }
         ]
       },
       {
-        name: "Clinical Pathology",
-        tests: [
-          { id: "p1", name: "Urine Routine & Microscopy", price: 150, refRange: "Standard", unit: "-" },
-          { id: "p2", name: "Stool Routine Examination", price: 150, refRange: "Standard", unit: "-" }
+        "name": "Serology",
+        "tests": [
+          { "id": "t38", "name": "Blood Grouping", "price": 50, "refRange": "-", "unit": "-" },
+          { "id": "t39", "name": "Rh Typing", "price": 50, "refRange": "-", "unit": "-" },
+          { "id": "t40", "name": "V.D.R.L. (Dils)", "price": 250, "refRange": "Negative (-ve)", "unit": "Dils" },
+          { "id": "t41", "name": "T.P.H.A. (Dils)", "price": 250, "refRange": "Negative (-ve)", "unit": "Dils" },
+          { "id": "t42", "name": "WIDAL - Salmonella Typhi O", "price": 150, "refRange": "-", "unit": "Dils" },
+          { "id": "t43", "name": "WIDAL - Salmonella Typhi H", "price": 150, "refRange": "-", "unit": "Dils" },
+          { "id": "t44", "name": "WIDAL - Salmonella Paratyphi A (H)", "price": 150, "refRange": "-", "unit": "Dils" },
+          { "id": "t45", "name": "WIDAL - Salmonella Paratyphi B (H)", "price": 150, "refRange": "-", "unit": "Dils" },
+          { "id": "t46", "name": "Malerial Parasite", "price": 0, "refRange": "Negative (-ve)", "unit": "-" },
+          { "id": "t47", "name": "R.A. Test", "price": 200, "refRange": "Negative (-ve)", "unit": "-" },
+          { "id": "t48", "name": "C.R.P.", "price": 200, "refRange": "Negative (-ve)", "unit": "-" },
+          { "id": "t49", "name": "HBsAg", "price": 250, "refRange": "Negative (-ve)", "unit": "-" },
+          { "id": "t50", "name": "H.I.V. 1 & H.I.V. 2", "price": 300, "refRange": "Negative (-ve)", "unit": "-" },
+          { "id": "t51", "name": "H.C.V.", "price": 200, "refRange": "Negative (-ve)", "unit": "-" },
+          { "id": "t52", "name": "ASO Titre", "price": 200, "refRange": "Negative (-ve)", "unit": "-" },
+          { "id": "t53", "name": "Dengue N.S.1", "price": 500, "refRange": "Negative (-ve)", "unit": "-" },
+          { "id": "t54", "name": "Dengue 1gM / 1gG", "price": 500, "refRange": "Negative (-ve)", "unit": "-" }
+        ]
+      },
+      {
+        "name": "Urine Analysis",
+        "tests": [
+          { "id": "t55", "name": "Albumin", "price": 180, "refRange": "-", "unit": "-" },
+          { "id": "t56", "name": "Sugar (Fasting)", "price": 180, "refRange": "-", "unit": "-" },
+          { "id": "t57", "name": "Sugar (P.P.)", "price": 180, "refRange": "-", "unit": "-" },
+          { "id": "t58", "name": "Bile Salts", "price": 180, "refRange": "-", "unit": "-" },
+          { "id": "t59", "name": "Bile Pigments", "price": 180, "refRange": "-", "unit": "-" },
+          { "id": "t60", "name": "Urobilinogen", "price": 180, "refRange": "-", "unit": "-" },
+          { "id": "t61", "name": "Occult Blood", "price": 180, "refRange": "-", "unit": "-" },
+          { "id": "t62", "name": "Pregnancy Test", "price": 180, "refRange": "-", "unit": "-" },
+          { "id": "t63", "name": "Microscopic Exam (Under HPF)", "price": 180, "refRange": "-", "unit": "-" },
+          { "id": "t64", "name": "Pus Cells", "price": 180, "refRange": "-", "unit": "-" },
+          { "id": "t65", "name": "RBC", "price": 180, "refRange": "-", "unit": "-" },
+          { "id": "t66", "name": "E.P. Cells", "price": 180, "refRange": "-", "unit": "-" },
+          { "id": "t67", "name": "Casts", "price": 180, "refRange": "-", "unit": "-" },
+          { "id": "t68", "name": "Crystals", "price": 180, "refRange": "-", "unit": "-" }
+        ]
+      },
+      {
+        "name": "Stool Examination",
+        "tests": [
+          { "id": "t69", "name": "Occult Blood", "price": 250, "refRange": "-", "unit": "-" },
+          { "id": "t70", "name": "Ova", "price": 250, "refRange": "-", "unit": "-" },
+          { "id": "t71", "name": "Cyst", "price": 250, "refRange": "-", "unit": "-" },
+          { "id": "t72", "name": "Glucose Test", "price": 250, "refRange": "-", "unit": "-" }
+        ]
+      },
+      {
+        "name": "Coagulation",
+        "tests": [
+          { "id": "t73", "name": "P.T.T. Test", "price": 350, "refRange": "-", "unit": "Secs" },
+          { "id": "t74", "name": "Control", "price": 350, "refRange": "-", "unit": "Secs" },
+          { "id": "t75", "name": "I.N.R.", "price": 350, "refRange": "-", "unit": "Secs" },
+          { "id": "t76", "name": "APTT", "price": 350, "refRange": "-", "unit": "Secs" }
         ]
       }
     ];
@@ -137,10 +197,10 @@ function Admin() {
     try {
       await batch.commit();
       fetchData();
-      alert("Comprehensive Test Catalog imported successfully.");
+      alert("Sri Balaji Clinical Laboratory Catalog imported successfully.");
     } catch (error) {
       console.error("Error seeding catalog: ", error);
-      alert("Error importing catalog.");
+      alert("Error importing catalog. Check console logs.");
     }
   };
 
@@ -315,7 +375,7 @@ function Admin() {
           </div>
         )}
 
-        {/* --- TEST CATALOG WITH EMBEDDED DICTIONARY --- */}
+        {/* --- TEST CATALOG WITH EXCEL DATA --- */}
         {activeTab === "catalog" && (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <div className="space-y-6 lg:col-span-1">
