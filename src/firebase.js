@@ -3,15 +3,15 @@ import { getFirestore } from "firebase/firestore";
 import { getAuth } from "firebase/auth";
 
 const firebaseConfig = {
-  apiKey: "YOUR_LAB_SOFT_API_KEY",
+  apiKey: "AIzaSyBi4QDWNareOtVvFf28yL-o3VsQzYW5tj0",
   authDomain: "lab-soft.firebaseapp.com",
   projectId: "lab-soft",
-  storageBucket: "lab-soft.appspot.com",
-  messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
-  appId: "YOUR_APP_ID"
+  storageBucket: "lab-soft.firebasestorage.app",
+  messagingSenderId: "536723946759",
+  appId: "1:536723946759:web:88365d6f0a4f6ca83319a2",
+  measurementId: "G-WC3RWE4YCR"
 };
 
-// Initialize Firebase App
 const app = initializeApp(firebaseConfig);
 
 export const db = getFirestore(app);
