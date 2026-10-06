@@ -64,4 +64,4 @@ export function RecordsTab({ pastRecords }) {
       </table>
     </div>
   );
-}
+} 
