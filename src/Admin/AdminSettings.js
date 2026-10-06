@@ -112,4 +112,4 @@ export function SettingsTab({ settings, setSettings }) {
       <button onClick={save} className="w-full bg-slate-800 text-white font-medium py-3 rounded">Save Logistics</button>
     </div>
   );
-}
+} 
