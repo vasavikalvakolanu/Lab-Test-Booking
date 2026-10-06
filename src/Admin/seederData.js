@@ -146,4 +146,4 @@ export const defaultPackages = [
     name: "Liver Function Test (LFT)", price: 850, isPackage: true, allowCoupons: false,
     tests: [ { name: "Total Bilirubin", refRange: "0.2-1.0", unit: "mg/dL" }, { name: "Direct Bilirubin", refRange: "-", unit: "mg/dL" }, { name: "In-direct Bilirubin", refRange: "-", unit: "mg/dL" }, { name: "S.G.P.T.", refRange: "5-40", unit: "U/L" }, { name: "S.G.O.T.", refRange: "5-40", unit: "U/L" }, { name: "Alkaline phosphatase", refRange: "40-129", unit: "U/L" }, { name: "L.F.T. Vanden Berg's", refRange: "Negative/Positive", unit: "-" } ]
   }
-];
+]; 
