@@ -49,19 +49,78 @@ export function BookingsTab({ liveBookings, referrals, fetchData }) {
 }
 
 export function RecordsTab({ pastRecords }) {
+  const [expandedLogId, setExpandedLogId] = useState(null);
+
   return (
     <div className="bg-white rounded border shadow-sm overflow-hidden">
       <table className="w-full text-left text-sm">
-        <thead className="bg-slate-50 border-b"><tr><th className="p-4">Date</th><th className="p-4">Patient Name</th><th className="p-4">Tests Conducted</th><th className="p-4">Amount Paid</th></tr></thead>
+        <thead className="bg-slate-50 border-b">
+          <tr>
+            <th className="p-4 text-slate-600 font-bold">Date / ID</th>
+            <th className="p-4 text-slate-600 font-bold">Patient Name</th>
+            <th className="p-4 text-slate-600 font-bold">Amount Paid</th>
+            <th className="p-4 text-slate-600 font-bold text-right">Audit Logs</th>
+          </tr>
+        </thead>
         <tbody className="divide-y divide-slate-100">
-          {pastRecords.map(b => (
-            <tr key={b.id} className="hover:bg-slate-50">
-              <td className="p-4">{b.date}</td><td className="p-4 font-medium">{b.name}</td>
-              <td className="p-4 text-slate-600 max-w-md truncate">{(b.cartItems || b.tests || []).map(i => i.name).join(", ")}</td><td className="p-4 font-bold">₹{b.total}</td>
-            </tr>
-          ))}
+          {pastRecords.length === 0 ? (
+            <tr><td colSpan="4" className="p-8 text-center text-slate-400">No completed patient records found.</td></tr>
+          ) : (
+            pastRecords.map(b => (
+              <React.Fragment key={b.id}>
+                <tr className="hover:bg-slate-50">
+                  <td className="p-4"><span className="block font-medium">{b.date}</span><span className="text-xs text-slate-500 font-mono">{b.clinicalId}</span></td>
+                  <td className="p-4 font-medium">{b.name}</td>
+                  <td className="p-4 font-bold">₹{b.total}</td>
+                  <td className="p-4 text-right">
+                    <button 
+                      onClick={() => setExpandedLogId(expandedLogId === b.id ? null : b.id)} 
+                      className="text-xs font-bold px-3 py-1 rounded border bg-white hover:bg-slate-100"
+                    >
+                      {expandedLogId === b.id ? "Hide Audit Trail" : "View Audit Trail"}
+                    </button>
+                  </td>
+                </tr>
+                
+                {/* Expanded Audit Log Row */}
+                {expandedLogId === b.id && (
+                  <tr className="bg-slate-50">
+                    <td colSpan="4" className="p-4 border-l-4 border-l-slate-800">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        
+                        {/* General History Logs (Modifications, Registrations) */}
+                        <div>
+                          <h4 className="text-xs font-bold text-slate-500 mb-2">MODIFICATION & ACTION HISTORY</h4>
+                          <ul className="space-y-1">
+                            {b.history ? b.history.map((h, i) => (
+                              <li key={i} className="text-xs text-slate-700">
+                                <span className="font-bold text-slate-900">{h.action}</span> by <span className="italic">{h.by}</span> on {new Date(h.time).toLocaleString()}
+                              </li>
+                            )) : <li className="text-xs text-slate-400">No history recorded.</li>}
+                          </ul>
+                        </div>
+
+                        {/* Specific PDF Download Logs */}
+                        <div>
+                          <h4 className="text-xs font-bold text-slate-500 mb-2">PDF DOWNLOAD TRACKING</h4>
+                          <ul className="space-y-1">
+                            {b.downloadLogs && b.downloadLogs.length > 0 ? b.downloadLogs.map((log, i) => (
+                              <li key={i} className="text-xs text-slate-700">
+                                <span className="font-bold text-emerald-700">File Downloaded</span> by <span className="italic">{log.by}</span> on {new Date(log.time).toLocaleString()}
+                              </li>
+                            )) : <li className="text-xs text-slate-400">File has never been downloaded.</li>}
+                          </ul>
+                        </div>
+
+                      </div>
+                    </td>
+                  </tr>
+                )}
+              </React.Fragment>
+            ))
+          )}
         </tbody>
       </table>
     </div>
   );
-} 
+}
