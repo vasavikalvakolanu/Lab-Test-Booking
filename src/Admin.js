@@ -3,29 +3,28 @@ import { db, auth } from "./firebase";
 import { signInWithEmailAndPassword, signOut, onAuthStateChanged } from "firebase/auth";
 import { collection, getDocs, doc, getDoc } from "firebase/firestore";
 
-// Note: Using capital 'Admin' folder path exactly as you requested!
+import { AdminDashboard } from "./Admin/AdminDashboard"; // NEW
 import { BookingsTab, RecordsTab } from "./Admin/AdminBookings";
 import { CatalogTab, PackagesTab } from "./Admin/AdminCatalog";
 import { ReferralsTab, CouponsTab, SettingsTab } from "./Admin/AdminSettings";
-import { StaffDesk } from "./Admin/StaffDesk"; 
+import { StaffManageTab } from "./Admin/AdminStaff"; // NEW
 
-// FEATURE 9: Role-Based Access Control
-// Add your specific admin email here. Anyone else who logs in will ONLY see the Staff Desk.
-const ADMIN_EMAILS = ["vasavikalvakolanu@gmail.com", "satyahanush@gmail.com", "keerthanasiddamsetti@gmail.com", "prasad.balajilab@gmail.com"]; 
+const ADMIN_EMAILS = ["vasavikalvakolanu@gmail.com", "satyahanush@gmail.com"]; 
 
 function Admin() {
   const [user, setUser] = useState(null);
-  const [role, setRole] = useState("staff");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   
-  const [activeTab, setActiveTab] = useState("desk"); // Default opens to Staff Desk
+  // Default to the new Dashboard Tab!
+  const [activeTab, setActiveTab] = useState("dashboard"); 
   
   const [bookings, setBookings] = useState([]);
   const [categories, setCategories] = useState([]);
   const [packages, setPackages] = useState([]);
   const [coupons, setCoupons] = useState([]);
   const [referrals, setReferrals] = useState([]);
+  const [staffAccounts, setStaffAccounts] = useState([]); // NEW
   const [settings, setSettings] = useState({ deliveryEnabled: true, maxDistance: 10, centers: [], tiers: [] });
   
   const [search, setSearch] = useState("");
@@ -34,33 +33,34 @@ function Admin() {
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       setUser(currentUser);
-      if (currentUser) {
-        // Check if the logged-in email is in the admin list
-        setRole(ADMIN_EMAILS.includes(currentUser.email) ? "admin" : "staff");
-        fetchData();
-      }
+      if (currentUser) fetchData();
     });
     return () => unsubscribe();
   }, []);
 
   const handleLogin = async (e) => {
     e.preventDefault();
+    if (!ADMIN_EMAILS.includes(email.toLowerCase())) {
+      alert("Access Denied. Admin privileges required. Please use the Staff Portal.");
+      return;
+    }
     try { 
       await signInWithEmailAndPassword(auth, email, password); 
     } catch (error) { 
-      alert("Authentication failed. Please check your credentials."); 
+      alert("Authentication failed. Please check credentials."); 
     }
   };
 
   const fetchData = async () => {
     try {
-      const [snapBookings, snapCats, snapPkgs, snapCoupons, snapRefs, snapSettings] = await Promise.all([
+      const [snapBookings, snapCats, snapPkgs, snapCoupons, snapRefs, snapSettings, snapStaff] = await Promise.all([
         getDocs(collection(db, "bookings")), 
         getDocs(collection(db, "testCategories")),
         getDocs(collection(db, "packages")), 
         getDocs(collection(db, "coupons")),
         getDocs(collection(db, "referrals")), 
-        getDoc(doc(db, "settings", "general"))
+        getDoc(doc(db, "settings", "general")),
+        getDocs(collection(db, "staff_accounts")) // Fetching our new staff accounts
       ]);
       
       setBookings(snapBookings.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0)));
@@ -68,16 +68,15 @@ function Admin() {
       setPackages(snapPkgs.docs.map(d => ({ id: d.id, ...d.data() })));
       setCoupons(snapCoupons.docs.map(d => ({ id: d.id, ...d.data() })));
       setReferrals(snapRefs.docs.map(d => ({ id: d.id, ...d.data() })));
+      setStaffAccounts(snapStaff.docs.map(d => ({ id: d.id, ...d.data() })));
+      
       if (snapSettings.exists()) setSettings(snapSettings.data());
     } catch (error) { 
       console.error("Data fetch error:", error); 
     }
   };
 
-  const filterData = (data) => data.filter(b => 
-    (b.name?.toLowerCase().includes(search.toLowerCase()) || b.phone?.includes(search)) && 
-    (!selectedDate || b.date === selectedDate)
-  );
+  const filterData = (data) => data.filter(b => (b.name?.toLowerCase().includes(search.toLowerCase()) || b.phone?.includes(search)) && (!selectedDate || b.date === selectedDate));
   
   const liveBookings = filterData(bookings.filter(b => b.status !== "done" && b.status !== "completed"));
   const pastRecords = filterData(bookings.filter(b => b.status === "done" || b.status === "completed"));
@@ -86,47 +85,59 @@ function Admin() {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-100 font-sans">
         <form onSubmit={handleLogin} className="bg-white p-8 rounded border shadow-sm w-96">
-          <h2 className="text-xl font-semibold text-slate-800 mb-6 text-center">System Administration</h2>
+          <h2 className="text-xl font-bold text-slate-800 mb-6 text-center">Admin Portal Login</h2>
           <div className="space-y-4">
-            <input type="email" placeholder="Email" value={email} onChange={e => setEmail(e.target.value)} className="w-full p-2 border rounded outline-none focus:border-slate-500" required />
-            <input type="password" placeholder="Password" value={password} onChange={e => setPassword(e.target.value)} className="w-full p-2 border rounded outline-none focus:border-slate-500" required />
-            <button type="submit" className="w-full bg-slate-800 hover:bg-slate-900 text-white font-medium py-2 rounded mt-2 transition">Secure Login</button>
+            <input type="email" placeholder="Admin Email" value={email} onChange={e => setEmail(e.target.value)} className="w-full p-2 border rounded outline-none focus:border-blue-500" required />
+            <input type="password" placeholder="Password" value={password} onChange={e => setPassword(e.target.value)} className="w-full p-2 border rounded outline-none focus:border-blue-500" required />
+            <button type="submit" className="w-full bg-slate-800 hover:bg-slate-900 transition text-white font-bold py-2 rounded mt-2">Secure Login</button>
           </div>
         </form>
       </div>
     );
   }
 
+  if (!ADMIN_EMAILS.includes(user.email.toLowerCase())) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 text-center">
+        <h2 className="text-2xl font-bold text-red-600 mb-4">Access Restricted</h2>
+        <p className="text-slate-600 mb-6">Your email ({user.email}) does not have administrative privileges.</p>
+        <button onClick={() => signOut(auth)} className="bg-slate-800 text-white px-6 py-2 rounded font-bold">Logout</button>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-slate-50 font-sans text-slate-800 pb-10">
-      
-      {/* Dynamic Header & Navigation */}
       <div className="bg-white border-b sticky top-0 z-10 shadow-sm">
         <div className="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
           <div>
-            <h1 className="text-xl font-semibold">Sri Balaji Diagnostics</h1>
-            <p className="text-xs text-slate-500 font-medium">Logged in as {role.toUpperCase()}</p>
+            <h1 className="text-xl font-bold">Sri Balaji Diagnostics</h1>
+            <p className="text-xs text-slate-500 font-medium">Enterprise Admin Portal</p>
           </div>
-          <button onClick={() => signOut(auth)} className="text-sm font-medium border border-slate-200 px-4 py-1.5 rounded hover:bg-slate-50 transition">Logout</button>
+          <div className="flex gap-4 items-center">
+            <span className="text-xs font-bold text-slate-500 bg-slate-100 px-2 py-1 rounded">{user.email}</span>
+            <button onClick={() => signOut(auth)} className="text-sm font-medium border border-slate-200 px-4 py-1.5 rounded hover:bg-slate-50">Logout</button>
+          </div>
         </div>
+        
+        {/* Navigation Tabs (Staff Desk has been removed) */}
         <div className="max-w-7xl mx-auto px-6 flex space-x-1 overflow-x-auto">
-          
-          {/* Staff Tab (Visible to ALL users) */}
-          <button onClick={() => setActiveTab("desk")} className={`px-4 py-3 text-sm font-medium border-b-2 whitespace-nowrap transition-colors ${activeTab === "desk" ? 'border-slate-800 text-slate-900' : 'border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50'}`}>
-            Staff Processing Desk
-          </button>
-          
-          {/* Admin Tabs (Visible ONLY if role is "admin") */}
-          {role === "admin" && [
+          {[
+            { id: 'dashboard', label: '📊 Daily Dashboard' },
             { id: 'bookings', label: `Web Bookings (${liveBookings.filter(b => b.collectionType === "home").length})` }, 
             { id: 'catalog', label: 'Test Catalog' },
             { id: 'packages', label: 'Health Packages' }, 
             { id: 'referrals', label: 'Doctor Referrals' },
             { id: 'coupons', label: 'Promo Coupons' }, 
-            { id: 'settings', label: 'Logistics Engine' }, 
-            { id: 'records', label: 'Past Records' }
+            { id: 'settings', label: 'Logistics' }, 
+            { id: 'staff', label: 'Staff Accounts' },
+            { id: 'records', label: 'Records' }
           ].map(tab => (
-            <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`px-4 py-3 text-sm font-medium border-b-2 whitespace-nowrap transition-colors ${activeTab === tab.id ? 'border-slate-800 text-slate-900' : 'border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50'}`}>
+            <button 
+              key={tab.id} 
+              onClick={() => setActiveTab(tab.id)} 
+              className={`px-4 py-3 text-sm font-bold border-b-2 whitespace-nowrap transition-colors ${activeTab === tab.id ? 'border-slate-800 text-slate-900' : 'border-transparent text-slate-500 hover:bg-slate-50'}`}
+            >
               {tab.label}
             </button>
           ))}
@@ -134,30 +145,23 @@ function Admin() {
       </div>
 
       <div className="max-w-7xl mx-auto px-6 mt-8">
-        
-        {/* Universal Search Bar for Bookings/Records */}
         {(activeTab === "bookings" || activeTab === "records") && (
           <div className="flex gap-4 mb-6 bg-white p-4 rounded border shadow-sm">
-            <input type="text" placeholder="Search patient name or phone number..." value={search} onChange={(e) => setSearch(e.target.value)} className="flex-1 p-2 border rounded text-sm outline-none focus:border-slate-500" />
+            <input type="text" placeholder="Search patient name..." value={search} onChange={(e) => setSearch(e.target.value)} className="flex-1 p-2 border rounded text-sm outline-none focus:border-slate-500" />
             <input type="date" value={selectedDate} onChange={(e) => setSelectedDate(e.target.value)} className="p-2 border rounded text-sm outline-none focus:border-slate-500" />
           </div>
         )}
 
-        {/* Dynamic Component Rendering Based on Tab Selection */}
-        {activeTab === "desk" && <StaffDesk categories={categories} packages={packages} referrals={referrals} liveBookings={liveBookings} userEmail={user.email} fetchData={fetchData} />}
-        
-        {/* Only render Admin Components if the user has admin privileges */}
-        {role === "admin" && (
-          <>
-            {activeTab === "bookings" && <BookingsTab liveBookings={liveBookings.filter(b => b.collectionType === "home")} referrals={referrals} fetchData={fetchData} />}
-            {activeTab === "catalog" && <CatalogTab categories={categories} fetchData={fetchData} />}
-            {activeTab === "packages" && <PackagesTab packages={packages} fetchData={fetchData} />}
-            {activeTab === "referrals" && <ReferralsTab referrals={referrals} pastRecords={pastRecords} fetchData={fetchData} />}
-            {activeTab === "coupons" && <CouponsTab coupons={coupons} fetchData={fetchData} />}
-            {activeTab === "settings" && <SettingsTab settings={settings} setSettings={setSettings} />}
-            {activeTab === "records" && <RecordsTab pastRecords={pastRecords} />}
-          </>
-        )}
+        {/* Dynamic Component Rendering */}
+        {activeTab === "dashboard" && <AdminDashboard liveBookings={liveBookings} userEmail={user.email} fetchData={fetchData} />}
+        {activeTab === "bookings" && <BookingsTab liveBookings={liveBookings.filter(b => b.collectionType === "home")} referrals={referrals} fetchData={fetchData} />}
+        {activeTab === "catalog" && <CatalogTab categories={categories} fetchData={fetchData} />}
+        {activeTab === "packages" && <PackagesTab packages={packages} fetchData={fetchData} />}
+        {activeTab === "referrals" && <ReferralsTab referrals={referrals} pastRecords={pastRecords} fetchData={fetchData} />}
+        {activeTab === "coupons" && <CouponsTab coupons={coupons} fetchData={fetchData} />}
+        {activeTab === "settings" && <SettingsTab settings={settings} setSettings={setSettings} />}
+        {activeTab === "staff" && <StaffManageTab staffAccounts={staffAccounts} fetchData={fetchData} />}
+        {activeTab === "records" && <RecordsTab pastRecords={pastRecords} />}
       </div>
     </div>
   );
