@@ -11,7 +11,7 @@ import { StaffDesk } from "./Admin/StaffDesk";
 
 // FEATURE 9: Role-Based Access Control
 // Add your specific admin email here. Anyone else who logs in will ONLY see the Staff Desk.
-const ADMIN_EMAILS = ["vasavikalvakolanu@gmail.com", "satyahanush@gmail.com"]; 
+const ADMIN_EMAILS = ["vasavikalvakolanu@gmail.com", "satyahanush@gmail.com", "keerthanasiddamsetti@gmail.com", "prasad.balajilab@gmail.com"]; 
 
 function Admin() {
   const [user, setUser] = useState(null);
