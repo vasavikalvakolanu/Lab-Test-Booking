@@ -10,6 +10,8 @@
     "firebase": "^10.8.0",
     "jspdf": "^2.5.1",
     "jspdf-autotable": "^3.8.2",
+    "jspdf": "^2.5.1",
+    "jspdf-autotable": "^3.8.1",
     "postcss": "^8.4.35",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
