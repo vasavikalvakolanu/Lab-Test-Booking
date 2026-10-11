@@ -124,7 +124,7 @@ function Admin() {
         <div className="max-w-7xl mx-auto px-6 flex space-x-1 overflow-x-auto">
           {[
             { id: 'dashboard', label: '📊 Daily Dashboard' },
-            { id: 'bookings', label: `Web Bookings (${liveBookings.filter(b => b.collectionType === "home").length})` }, 
+            { id: 'bookings', label: `Web Bookings (${liveBookings.filter(b => b.collectionType === "Walk-in").length})` }, 
             { id: 'catalog', label: 'Test Catalog' },
             { id: 'packages', label: 'Health Packages' }, 
             { id: 'referrals', label: 'Doctor Referrals' },
@@ -154,7 +154,7 @@ function Admin() {
 
         {/* Dynamic Component Rendering */}
         {activeTab === "dashboard" && <AdminDashboard liveBookings={liveBookings} userEmail={user.email} fetchData={fetchData} />}
-        {activeTab === "bookings" && <BookingsTab liveBookings={liveBookings.filter(b => b.collectionType === "home")} referrals={referrals} fetchData={fetchData} />}
+        {activeTab === "bookings" && <BookingsTab liveBookings={liveBookings.filter(b => b.collectionType === "Walk-in")} referrals={referrals} fetchData={fetchData} />}
         {activeTab === "catalog" && <CatalogTab categories={categories} fetchData={fetchData} />}
         {activeTab === "packages" && <PackagesTab packages={packages} fetchData={fetchData} />}
         {activeTab === "referrals" && <ReferralsTab referrals={referrals} pastRecords={pastRecords} fetchData={fetchData} />}
