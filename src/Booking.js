@@ -8,17 +8,14 @@ function CustomerPortal() {
   const [search, setSearch] = useState("");
   const [cart, setCart] = useState([]);
 
-  // Restored: Advanced Booking State
   const [patient, setPatient] = useState({ name: "", phone: "", date: "", timeSlot: "", address: "" });
-  const [collectionType, setCollectionType] = useState("home"); // "home" or "lab"
+  const [collectionType, setCollectionType] = useState("home"); 
   
-  // Restored: Promo Code Engine
   const [promoInput, setPromoInput] = useState("");
   const [appliedPromo, setAppliedPromo] = useState(null);
   
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Standard Time Slots
   const timeSlots = [
     "06:00 AM - 07:00 AM", "07:00 AM - 08:00 AM", "08:00 AM - 09:00 AM", 
     "09:00 AM - 10:00 AM", "10:00 AM - 11:00 AM", "11:00 AM - 12:00 PM",
@@ -34,23 +31,36 @@ function CustomerPortal() {
 
         setCoupons(couponsSnap.docs.map((d) => d.data()));
 
-        let allItems = [];
-        
-        // Push Packages First (Issue 4 resolved)
+        let pkgs = [];
         pkgsSnap.docs.forEach((doc) => {
-          const data = doc.data();
-          allItems.push({ ...data, isPackage: true });
+          pkgs.push({ ...doc.data(), isPackage: true });
         });
 
-        // Push Individual Tests Second
+        const testMap = new Map();
+        
+        // 1. Get tests from regular categories
         catsSnap.docs.forEach((doc) => {
           const data = doc.data();
           if (data.tests && data.tests.length > 0) {
-            const individualTests = data.tests.map((t) => ({ ...t, isPackage: false }));
-            allItems = [...allItems, ...individualTests];
+            data.tests.forEach(t => testMap.set(t.name.toLowerCase(), { ...t, isPackage: false }));
           }
         });
 
+        // 2. EXTRACT sub-tests from inside Packages (Fixes Issue 1)
+        pkgsSnap.docs.forEach((doc) => {
+          const data = doc.data();
+          if (data.tests && data.tests.length > 0) {
+            data.tests.forEach(t => {
+              // Only add if it doesn't already exist to prevent duplicates
+              if (!testMap.has(t.name.toLowerCase())) {
+                testMap.set(t.name.toLowerCase(), { ...t, isPackage: false });
+              }
+            });
+          }
+        });
+
+        // Combine packages first, then all unique individual tests
+        const allItems = [...pkgs, ...Array.from(testMap.values())];
         setCatalog(allItems);
       } catch (error) {
         console.error("Error fetching catalog:", error);
@@ -64,14 +74,13 @@ function CustomerPortal() {
     return item.name.toLowerCase().includes(search.toLowerCase());
   });
 
-  // Math Logic for Cart, Discount, and Delivery
   const subtotal = cart.reduce((sum, item) => {
     const price = item.discountedPrice ? item.discountedPrice : item.price;
     return sum + Number(price);
   }, 0);
 
   const discountAmount = appliedPromo ? (subtotal * appliedPromo.discount) / 100 : 0;
-  const deliveryFee = collectionType === "home" ? 200 : 0; // Flat fee for home visits
+  const deliveryFee = collectionType === "home" ? 200 : 0; 
   const grandTotal = subtotal - discountAmount + deliveryFee;
 
   const addToCart = (item) => {
@@ -108,6 +117,9 @@ function CustomerPortal() {
 
     setIsSubmitting(true);
     try {
+      // Flatten packages so staff gets clinical entry fields, but keep cartItems for billing
+      const flatTests = cart.flatMap(t => t.isPackage ? t.tests : [t]);
+
       await addDoc(collection(db, "bookings"), {
         name: patient.name,
         phone: patient.phone,
@@ -115,8 +127,8 @@ function CustomerPortal() {
         timeSlot: patient.timeSlot,
         address: collectionType === "home" ? patient.address : "",
         collectionType: collectionType,
-        tests: cart,
-        cartItems: cart,
+        tests: flatTests,      // Used by staff for result entry
+        cartItems: cart,       // Used for billing and receipts
         subtotal: subtotal,
         discount: discountAmount,
         couponUsed: appliedPromo ? appliedPromo.code : "",
