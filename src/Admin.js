@@ -4,9 +4,9 @@ import { signInWithEmailAndPassword, signOut, onAuthStateChanged } from "firebas
 import { collection, getDocs, doc, getDoc } from "firebase/firestore";
 
 // Import your newly refactored components
-import { BookingsTab, RecordsTab } from "./admin/AdminBookings";
-import { CatalogTab, PackagesTab } from "./admin/AdminCatalog";
-import { ReferralsTab, CouponsTab, SettingsTab } from "./admin/AdminSettings";
+import { BookingsTab, RecordsTab } from "./Admin/AdminBookings";
+import { CatalogTab, PackagesTab } from "./Admin/AdminCatalog";
+import { ReferralsTab, CouponsTab, SettingsTab } from "./Admin/AdminSettings";
 
 function Admin() {
   const [user, setUser] = useState(null);
