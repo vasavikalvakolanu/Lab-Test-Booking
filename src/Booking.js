@@ -3,19 +3,24 @@ import { db } from "./firebase";
 import { collection, getDocs, addDoc } from "firebase/firestore";
 
 function CustomerPortal() {
-  const [catalog, setCatalog] = useState([]);
+  const [packages, setPackages] = useState([]);
+  const [individualTests, setIndividualTests] = useState([]);
   const [coupons, setCoupons] = useState([]);
+  
   const [search, setSearch] = useState("");
   const [cart, setCart] = useState([]);
 
+  // Restored: Advanced Booking State
   const [patient, setPatient] = useState({ name: "", phone: "", date: "", timeSlot: "", address: "" });
-  const [collectionType, setCollectionType] = useState("home"); 
+  const [collectionType, setCollectionType] = useState("home"); // "home" or "lab"
   
+  // Restored: Promo Code Engine
   const [promoInput, setPromoInput] = useState("");
   const [appliedPromo, setAppliedPromo] = useState(null);
   
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // Standard Time Slots
   const timeSlots = [
     "06:00 AM - 07:00 AM", "07:00 AM - 08:00 AM", "08:00 AM - 09:00 AM", 
     "09:00 AM - 10:00 AM", "10:00 AM - 11:00 AM", "11:00 AM - 12:00 PM",
@@ -31,14 +36,13 @@ function CustomerPortal() {
 
         setCoupons(couponsSnap.docs.map((d) => d.data()));
 
-        let pkgs = [];
-        pkgsSnap.docs.forEach((doc) => {
-          pkgs.push({ ...doc.data(), isPackage: true });
-        });
+        // 1. Set Packages (These will display as big cards)
+        const loadedPackages = pkgsSnap.docs.map((doc) => ({ ...doc.data(), isPackage: true }));
+        setPackages(loadedPackages);
 
+        // 2. Extract Individual Tests (These will only show in Search)
         const testMap = new Map();
         
-        // 1. Get tests from regular categories
         catsSnap.docs.forEach((doc) => {
           const data = doc.data();
           if (data.tests && data.tests.length > 0) {
@@ -46,12 +50,11 @@ function CustomerPortal() {
           }
         });
 
-        // 2. EXTRACT sub-tests from inside Packages (Fixes Issue 1)
+        // Extract sub-tests from packages so they can be booked individually!
         pkgsSnap.docs.forEach((doc) => {
           const data = doc.data();
           if (data.tests && data.tests.length > 0) {
             data.tests.forEach(t => {
-              // Only add if it doesn't already exist to prevent duplicates
               if (!testMap.has(t.name.toLowerCase())) {
                 testMap.set(t.name.toLowerCase(), { ...t, isPackage: false });
               }
@@ -59,9 +62,7 @@ function CustomerPortal() {
           }
         });
 
-        // Combine packages first, then all unique individual tests
-        const allItems = [...pkgs, ...Array.from(testMap.values())];
-        setCatalog(allItems);
+        setIndividualTests(Array.from(testMap.values()));
       } catch (error) {
         console.error("Error fetching catalog:", error);
       }
@@ -69,18 +70,20 @@ function CustomerPortal() {
     fetchCatalog();
   }, []);
 
-  const filteredCatalog = catalog.filter((item) => {
+  // Search Logic: Shows tests and packages that match
+  const searchResults = search ? [...packages, ...individualTests].filter((item) => {
     if (!item || !item.name) return false;
     return item.name.toLowerCase().includes(search.toLowerCase());
-  });
+  }) : [];
 
+  // Math Logic for Cart, Discount, and Delivery
   const subtotal = cart.reduce((sum, item) => {
     const price = item.discountedPrice ? item.discountedPrice : item.price;
     return sum + Number(price);
   }, 0);
 
   const discountAmount = appliedPromo ? (subtotal * appliedPromo.discount) / 100 : 0;
-  const deliveryFee = collectionType === "home" ? 200 : 0; 
+  const deliveryFee = collectionType === "home" ? 200 : 0; // Flat fee for home visits
   const grandTotal = subtotal - discountAmount + deliveryFee;
 
   const addToCart = (item) => {
@@ -154,130 +157,189 @@ function CustomerPortal() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 font-sans p-4 md:p-8">
-      <div className="max-w-7xl mx-auto grid grid-cols-1 xl:grid-cols-2 gap-8">
-        
-        {/* LEFT COLUMN: Catalog */}
-        <div className="bg-white p-6 md:p-8 rounded-xl shadow-sm border border-slate-200">
-          <h2 className="text-2xl font-bold text-blue-800 mb-6">1. Select Lab Tests & Packages</h2>
+    <div className="min-h-screen bg-slate-50 font-sans pb-10">
+      
+      {/* Restored Header Component */}
+      <div className="bg-white py-8 border-b-4 border-blue-600 mb-8 shadow-sm">
+        <div className="max-w-7xl mx-auto px-6 text-center">
+          <h1 className="text-4xl font-extrabold text-blue-800 mb-2 tracking-tight">Sri Balaji Diagnostics</h1>
+          <p className="text-slate-600 font-medium text-lg">Professional Lab Tests & Home Collection</p>
           
-          <div className="relative mb-6">
-            <span className="absolute left-4 top-3.5 text-lg">🔍</span>
+          <div className="mt-6 inline-flex flex-col md:flex-row items-center gap-4 bg-slate-50 border border-slate-200 px-6 py-3 rounded-full text-sm font-medium text-slate-700">
+            <span className="flex items-center"><span className="text-rose-500 mr-2 text-lg">📍</span> Sathiraju complex, near Ganapathi Bhojanam hotel, Main road, Kothapeta</span>
+            <span className="hidden md:inline text-slate-300">|</span>
+            <span className="flex items-center font-bold text-blue-700"><span className="text-rose-500 mr-2 text-lg">📞</span> +91 9849923729</span>
+          </div>
+        </div>
+      </div>
+
+      <div className="max-w-7xl mx-auto px-4 grid grid-cols-1 xl:grid-cols-12 gap-8">
+        
+        {/* LEFT COLUMN: Catalog (8 columns wide) */}
+        <div className="xl:col-span-8 bg-white p-6 md:p-8 rounded-2xl shadow-sm border border-slate-100">
+          
+          {/* Search Bar Restored */}
+          <div className="relative mb-10">
+            <span className="absolute left-5 top-4 text-xl">🔍</span>
             <input
               type="text"
-              placeholder="Search for tests or health profiles..."
+              placeholder="Search for individual tests (e.g. Urine Sugar, Platelet Count) or packages..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-12 pr-4 py-3 border-2 border-blue-400 rounded-lg outline-none focus:border-blue-600 text-slate-700"
+              className="w-full pl-14 pr-6 py-4 border-2 border-blue-200 rounded-full outline-none focus:border-blue-600 text-slate-700 text-lg shadow-inner transition"
             />
           </div>
 
-          <div className="space-y-3 overflow-y-auto max-h-[700px] pr-2">
-            {catalog.length === 0 ? (
-              <p className="text-slate-500 text-center py-10">Loading catalog...</p>
-            ) : filteredCatalog.length === 0 ? (
-              <p className="text-slate-500 text-center py-10">No tests match your search.</p>
-            ) : (
-              filteredCatalog.map((item, idx) => {
-                const price = item.discountedPrice ? item.discountedPrice : item.price;
-                return (
-                  <div key={idx} className={`flex justify-between items-center p-4 border rounded-lg transition ${item.isPackage ? 'border-amber-300 bg-amber-50' : 'border-slate-200 hover:border-blue-300'}`}>
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <h4 className="font-bold text-slate-800">{item.name}</h4>
-                        {item.isPackage && <span className="bg-amber-500 text-white text-[10px] uppercase font-bold px-2 py-0.5 rounded">Package</span>}
+          {/* Conditional Rendering: Show Search Results OR Show Big Packages */}
+          {search ? (
+            <div>
+              <h3 className="text-xl font-bold text-slate-800 mb-4 border-b pb-2">Search Results</h3>
+              <div className="space-y-3">
+                {searchResults.length === 0 ? (
+                  <p className="text-slate-500 italic py-4">No individual tests or packages match your search.</p>
+                ) : (
+                  searchResults.map((item, idx) => {
+                    const price = item.discountedPrice ? item.discountedPrice : item.price;
+                    return (
+                      <div key={idx} className={`flex justify-between items-center p-4 border rounded-xl transition ${item.isPackage ? 'border-amber-200 bg-amber-50/50' : 'border-slate-200 hover:border-blue-300 hover:shadow-md'}`}>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <h4 className="font-bold text-slate-800 text-lg">{item.name}</h4>
+                            {item.isPackage && <span className="bg-amber-500 text-white text-[10px] uppercase font-bold px-2 py-0.5 rounded">Package</span>}
+                          </div>
+                          <p className="text-lg font-bold text-emerald-600 mt-1">₹{price}</p>
+                        </div>
+                        <button 
+                          onClick={() => addToCart(item)}
+                          className="bg-blue-50 text-blue-700 font-bold border border-blue-200 px-6 py-3 rounded-lg hover:bg-blue-600 hover:text-white transition shadow-sm"
+                        >
+                          Add +
+                        </button>
                       </div>
-                      <p className="text-sm font-semibold text-emerald-600 mt-1">₹{price}</p>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+          ) : (
+            <div className="bg-purple-50/50 p-6 md:p-8 rounded-2xl border border-purple-100">
+              <h2 className="text-2xl font-bold text-purple-900 mb-6 flex items-center">✨ Exclusive Health Packages</h2>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {packages.length === 0 ? <p className="text-slate-500 italic">No packages available.</p> : packages.map((pkg, idx) => (
+                  <div key={idx} className="bg-white rounded-xl border border-purple-200 shadow-sm hover:shadow-md transition overflow-hidden relative flex flex-col">
+                    
+                    {/* Special Offer Badge */}
+                    <div className="absolute top-0 right-0 bg-rose-500 text-white text-xs font-bold px-4 py-1.5 rounded-bl-lg uppercase tracking-wider">
+                      Special Offer
                     </div>
-                    <button 
-                      onClick={() => addToCart(item)}
-                      className="bg-blue-50 text-blue-700 font-bold border border-blue-200 px-4 py-2 rounded-lg hover:bg-blue-100 transition"
-                    >
-                      Add +
-                    </button>
+                    
+                    <div className="p-6 flex-1">
+                      <h3 className="text-xl font-bold text-purple-900 mb-2 pr-16">{pkg.name}</h3>
+                      <span className="inline-block bg-orange-100 text-orange-800 text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wide mb-4">No Extra Coupons</span>
+                      
+                      <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Package Includes:</p>
+                      <div className="flex flex-wrap gap-2 mb-6">
+                        {(pkg.tests || []).map((t, i) => (
+                          <span key={i} className="bg-purple-50 text-purple-700 border border-purple-200 px-2.5 py-1 rounded text-xs font-medium">
+                            {t.name}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                    
+                    <div className="bg-slate-50 p-4 border-t border-slate-100 flex justify-between items-center mt-auto">
+                      <div>
+                        <p className="text-xs text-slate-500 font-medium">Package Price</p>
+                        <p className="text-2xl font-extrabold text-emerald-600">₹{pkg.discountedPrice || pkg.price}</p>
+                      </div>
+                      <button onClick={() => addToCart(pkg)} className="bg-purple-600 hover:bg-purple-700 text-white font-bold px-6 py-3 rounded-lg shadow-sm transition">
+                        Add to Cart
+                      </button>
+                    </div>
                   </div>
-                );
-              })
-            )}
-          </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
-        {/* RIGHT COLUMN: Booking Form */}
-        <div className="bg-white p-6 md:p-8 rounded-xl shadow-sm border border-slate-200 self-start">
-          <h2 className="text-2xl font-bold text-blue-800 mb-6">2. Patient & Booking Details</h2>
+        {/* RIGHT COLUMN: Booking Form (4 columns wide) */}
+        <div className="xl:col-span-4 bg-white p-6 md:p-8 rounded-2xl shadow-sm border border-slate-100 self-start sticky top-6">
+          <h2 className="text-xl font-bold text-slate-800 mb-6">Patient Details</h2>
           
-          <div className="flex gap-4 mb-6">
-            <button onClick={() => setCollectionType("home")} className={`flex-1 py-3 rounded-lg font-bold border-2 transition ${collectionType === "home" ? 'border-blue-600 bg-blue-50 text-blue-800' : 'border-slate-200 text-slate-500'}`}>🏠 Home Collection</button>
-            <button onClick={() => setCollectionType("lab")} className={`flex-1 py-3 rounded-lg font-bold border-2 transition ${collectionType === "lab" ? 'border-blue-600 bg-blue-50 text-blue-800' : 'border-slate-200 text-slate-500'}`}>🏥 Lab Visit</button>
+          <div className="flex gap-3 mb-6 bg-slate-100 p-1.5 rounded-xl">
+            <button onClick={() => setCollectionType("home")} className={`flex-1 py-2.5 rounded-lg font-bold transition text-sm ${collectionType === "home" ? 'bg-white text-blue-700 shadow-sm border border-slate-200' : 'text-slate-500 hover:text-slate-700'}`}>🏠 Home Collection</button>
+            <button onClick={() => setCollectionType("lab")} className={`flex-1 py-2.5 rounded-lg font-bold transition text-sm ${collectionType === "lab" ? 'bg-white text-blue-700 shadow-sm border border-slate-200' : 'text-slate-500 hover:text-slate-700'}`}>🏥 Lab Visit</button>
           </div>
 
-          <div className="space-y-4 mb-8">
+          <div className="space-y-5 mb-8">
             <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-1">Full Name</label>
-              <input type="text" value={patient.name} onChange={(e) => setPatient({...patient, name: e.target.value})} className="w-full p-3 border border-slate-200 rounded-lg outline-none focus:border-blue-400" />
+              <label className="block text-sm font-bold text-slate-700 mb-1.5">Full Name</label>
+              <input type="text" placeholder="Enter patient name" value={patient.name} onChange={(e) => setPatient({...patient, name: e.target.value})} className="w-full p-3 border border-slate-200 rounded-lg outline-none focus:border-blue-500 bg-slate-50 focus:bg-white transition" />
+            </div>
+            
+            <div>
+              <label className="block text-sm font-bold text-slate-700 mb-1.5">WhatsApp Number</label>
+              <input type="tel" placeholder="10-digit number" value={patient.phone} onChange={(e) => setPatient({...patient, phone: e.target.value})} className="w-full p-3 border border-slate-200 rounded-lg outline-none focus:border-blue-500 bg-slate-50 focus:bg-white transition" />
             </div>
             
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-1">Phone Number</label>
-                <input type="tel" value={patient.phone} onChange={(e) => setPatient({...patient, phone: e.target.value})} className="w-full p-3 border border-slate-200 rounded-lg outline-none focus:border-blue-400" />
+                <label className="block text-sm font-bold text-slate-700 mb-1.5">Preferred Date</label>
+                <input type="date" value={patient.date} onChange={(e) => setPatient({...patient, date: e.target.value})} className="w-full p-3 border border-slate-200 rounded-lg outline-none focus:border-blue-500 bg-slate-50 focus:bg-white transition text-sm" />
               </div>
               <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-1">Preferred Date</label>
-                <input type="date" value={patient.date} onChange={(e) => setPatient({...patient, date: e.target.value})} className="w-full p-3 border border-slate-200 rounded-lg outline-none focus:border-blue-400" />
+                <label className="block text-sm font-bold text-slate-700 mb-1.5">Time Slot</label>
+                <select value={patient.timeSlot} onChange={(e) => setPatient({...patient, timeSlot: e.target.value})} className="w-full p-3 border border-slate-200 rounded-lg outline-none focus:border-blue-500 bg-slate-50 focus:bg-white transition text-sm">
+                  <option value="">Select Time</option>
+                  {timeSlots.map(slot => <option key={slot} value={slot}>{slot.split(" - ")[0]}</option>)}
+                </select>
               </div>
-            </div>
-
-            <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-1">Preferred Time Slot</label>
-              <select value={patient.timeSlot} onChange={(e) => setPatient({...patient, timeSlot: e.target.value})} className="w-full p-3 border border-slate-200 rounded-lg outline-none focus:border-blue-400 bg-white">
-                <option value="">-- Select a Time Slot --</option>
-                {timeSlots.map(slot => <option key={slot} value={slot}>{slot}</option>)}
-              </select>
             </div>
 
             {collectionType === "home" && (
               <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-1">Full Address for Home Visit</label>
-                <textarea rows="2" value={patient.address} onChange={(e) => setPatient({...patient, address: e.target.value})} className="w-full p-3 border border-slate-200 rounded-lg outline-none focus:border-blue-400"></textarea>
+                <label className="block text-sm font-bold text-slate-700 mb-1.5">Complete Address</label>
+                <textarea rows="2" placeholder="House no, Street, Landmark" value={patient.address} onChange={(e) => setPatient({...patient, address: e.target.value})} className="w-full p-3 border border-slate-200 rounded-lg outline-none focus:border-blue-500 bg-slate-50 focus:bg-white transition"></textarea>
               </div>
             )}
           </div>
 
-          <div className="border border-slate-200 rounded-xl p-5 mb-6 bg-slate-50">
-            <h3 className="font-bold text-slate-800 mb-3">Booking Summary</h3>
+          <div className="border-t border-slate-200 pt-6 mb-6">
+            <h3 className="font-bold text-slate-800 mb-4 text-lg">Booking Summary</h3>
             
-            <div className="min-h-[60px] mb-4 border-b border-slate-200 pb-4 space-y-2">
-              {cart.length === 0 ? <p className="text-sm text-slate-500 italic">No tests selected yet.</p> : cart.map((item, idx) => (
-                <div key={idx} className="flex justify-between items-center text-sm">
-                  <span className="text-slate-700 font-medium">{item.name}</span>
-                  <div className="flex items-center gap-3">
-                    <span className="font-bold text-slate-800">₹{item.discountedPrice ? item.discountedPrice : item.price}</span>
-                    <button onClick={() => removeFromCart(idx)} className="text-red-500 font-bold text-lg leading-none">&times;</button>
+            <div className="min-h-[40px] mb-6 space-y-3">
+              {cart.length === 0 ? <p className="text-sm text-slate-400 italic">No tests selected yet.</p> : cart.map((item, idx) => (
+                <div key={idx} className="flex justify-between items-start text-sm bg-slate-50 p-3 rounded-lg border border-slate-100">
+                  <span className="text-slate-700 font-medium pr-4">{item.name}</span>
+                  <div className="flex items-center gap-3 shrink-0">
+                    <span className="font-bold text-slate-800">₹{item.discountedPrice || item.price}</span>
+                    <button onClick={() => removeFromCart(idx)} className="text-rose-500 hover:text-rose-700 font-bold text-lg leading-none bg-rose-50 hover:bg-rose-100 w-6 h-6 rounded-full flex items-center justify-center transition">&times;</button>
                   </div>
                 </div>
               ))}
             </div>
 
-            <div className="flex gap-2 mb-4 pb-4 border-b border-slate-200">
-              <input type="text" placeholder="Promo Code" value={promoInput} onChange={(e) => setPromoInput(e.target.value)} className="flex-1 p-2 border border-slate-300 rounded uppercase outline-none text-sm" />
-              <button onClick={applyPromoCode} className="bg-slate-800 text-white px-4 py-2 rounded text-sm font-bold">Apply</button>
+            <div className="flex gap-2 mb-6">
+              <input type="text" placeholder="Got a Promo Code?" value={promoInput} onChange={(e) => setPromoInput(e.target.value)} className="flex-1 p-3 border border-slate-200 rounded-lg uppercase outline-none focus:border-blue-500 text-sm bg-slate-50 focus:bg-white transition" />
+              <button onClick={applyPromoCode} className="bg-slate-800 hover:bg-slate-900 text-white px-5 rounded-lg text-sm font-bold transition">Apply</button>
             </div>
             
-            <div className="space-y-2 text-sm text-slate-600 mb-4">
-              <div className="flex justify-between"><span>Subtotal</span><span className="font-medium">₹{subtotal}</span></div>
+            <div className="space-y-3 text-sm text-slate-600 mb-6 bg-slate-50 p-4 rounded-xl border border-slate-100">
+              <div className="flex justify-between"><span>Subtotal</span><span className="font-bold text-slate-800">₹{subtotal}</span></div>
               {appliedPromo && <div className="flex justify-between text-emerald-600 font-bold"><span>Discount ({appliedPromo.discount}%)</span><span>- ₹{discountAmount}</span></div>}
-              {collectionType === "home" && <div className="flex justify-between"><span>Home Visit Fee</span><span className="font-medium">₹{deliveryFee}</span></div>}
-            </div>
-
-            <div className="flex justify-between items-center pt-3 border-t border-slate-300">
-              <span className="font-bold text-blue-800 text-lg">Grand Total</span>
-              <span className="font-bold text-blue-800 text-2xl">₹{grandTotal}</span>
+              {collectionType === "home" && <div className="flex justify-between"><span>Home Visit Fee</span><span className="font-bold text-slate-800">₹{deliveryFee}</span></div>}
+              
+              <div className="flex justify-between items-center pt-4 mt-2 border-t border-slate-200">
+                <span className="font-bold text-blue-900 text-lg">Total Amount</span>
+                <span className="font-extrabold text-blue-700 text-2xl">₹{grandTotal}</span>
+              </div>
             </div>
           </div>
 
-          <button onClick={handleBooking} disabled={isSubmitting} className="w-full py-4 bg-blue-600 hover:bg-blue-700 text-white text-lg font-bold rounded-lg transition disabled:bg-slate-400 shadow-sm">
-            {isSubmitting ? "Processing..." : "Confirm Booking"}
+          <button onClick={handleBooking} disabled={isSubmitting} className="w-full py-4 bg-blue-600 hover:bg-blue-700 text-white text-lg font-bold rounded-xl transition disabled:bg-slate-400 shadow-lg shadow-blue-200">
+            {isSubmitting ? "Processing Request..." : "Confirm Booking"}
           </button>
         </div>
 
