@@ -10,17 +10,15 @@ function CustomerPortal() {
   const [search, setSearch] = useState("");
   const [cart, setCart] = useState([]);
 
-  // Restored: Advanced Booking State
+  // Booking State
   const [patient, setPatient] = useState({ name: "", phone: "", date: "", timeSlot: "", address: "" });
   const [collectionType, setCollectionType] = useState("home"); // "home" or "lab"
   
-  // Restored: Promo Code Engine
+  // Promo Code Engine
   const [promoInput, setPromoInput] = useState("");
   const [appliedPromo, setAppliedPromo] = useState(null);
-  
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Standard Time Slots
   const timeSlots = [
     "06:00 AM - 07:00 AM", "07:00 AM - 08:00 AM", "08:00 AM - 09:00 AM", 
     "09:00 AM - 10:00 AM", "10:00 AM - 11:00 AM", "11:00 AM - 12:00 PM",
@@ -36,33 +34,82 @@ function CustomerPortal() {
 
         setCoupons(couponsSnap.docs.map((d) => d.data()));
 
-        // 1. Set Packages (These will display as big cards)
-        const loadedPackages = pkgsSnap.docs.map((doc) => ({ ...doc.data(), isPackage: true }));
-        setPackages(loadedPackages);
+        const exclusivePkgs = [];
+        const routinePkgs = [];
 
-        // 2. Extract Individual Tests (These will only show in Search)
-        const testMap = new Map();
-        
-        catsSnap.docs.forEach((doc) => {
+        // 1. Smart Filtering: Separate Big Packages from Routine Packages
+        pkgsSnap.docs.forEach((doc) => {
           const data = doc.data();
-          if (data.tests && data.tests.length > 0) {
-            data.tests.forEach(t => testMap.set(t.name.toLowerCase(), { ...t, isPackage: false }));
+          const nameLower = (data.name || "").toLowerCase();
+          
+          // Words that define a routine, normal package
+          const isRoutine = 
+            nameLower.includes("cbc") || 
+            nameLower.includes("blood count") || 
+            nameLower.includes("lipid") || 
+            nameLower.includes("liver") || 
+            nameLower.includes("thyroid") || 
+            nameLower.includes("urine") || 
+            nameLower.includes("stool") || 
+            nameLower.includes("renal") || 
+            nameLower.includes("kidney") || 
+            nameLower.includes("profile") ||
+            nameLower.includes("analysis") ||
+            nameLower.includes("examination");
+
+          let isExclusive = false;
+          
+          // Words that define a major health checkup
+          if (nameLower.includes("checkup") || nameLower.includes("body") || nameLower.includes("health") || nameLower.includes("master") || nameLower.includes("comprehensive") || nameLower.includes("exclusive") || nameLower.includes("basic")) {
+            isExclusive = true;
+          } else if (isRoutine) {
+            isExclusive = false;
+          } else if ((data.price || data.discountedPrice) >= 800) {
+            isExclusive = true; // Fallback: expensive items are usually big packages
+          } else {
+            isExclusive = false;
+          }
+
+          if (isExclusive) {
+            exclusivePkgs.push({ ...data, isPackage: true });
+          } else {
+            routinePkgs.push({ ...data, isPackage: true });
           }
         });
 
-        // Extract sub-tests from packages so they can be booked individually!
+        // Set ONLY the exclusive checkups to the Big Cards section
+        setPackages(exclusivePkgs);
+
+        // 2. Build the Universal Search Map
+        const searchItemsMap = new Map();
+
+        // Add routine packages (CBC, Lipid, etc.) strictly to the search bar
+        routinePkgs.forEach(p => searchItemsMap.set(p.name.toLowerCase(), p));
+        
+        // Add exclusive packages to search as well, just in case
+        exclusivePkgs.forEach(p => searchItemsMap.set(p.name.toLowerCase(), p));
+
+        // Add individual tests from test Categories
+        catsSnap.docs.forEach((doc) => {
+          const data = doc.data();
+          if (data.tests && data.tests.length > 0) {
+            data.tests.forEach(t => searchItemsMap.set(t.name.toLowerCase(), { ...t, isPackage: false }));
+          }
+        });
+
+        // FORCE EXTRACT: Pull every single sub-parameter (Total Cholesterol, Haemoglobin) out of ALL packages and make them individually searchable
         pkgsSnap.docs.forEach((doc) => {
           const data = doc.data();
           if (data.tests && data.tests.length > 0) {
             data.tests.forEach(t => {
-              if (!testMap.has(t.name.toLowerCase())) {
-                testMap.set(t.name.toLowerCase(), { ...t, isPackage: false });
+              if (!searchItemsMap.has(t.name.toLowerCase())) {
+                searchItemsMap.set(t.name.toLowerCase(), { ...t, isPackage: false });
               }
             });
           }
         });
 
-        setIndividualTests(Array.from(testMap.values()));
+        setIndividualTests(Array.from(searchItemsMap.values()));
       } catch (error) {
         console.error("Error fetching catalog:", error);
       }
@@ -70,8 +117,8 @@ function CustomerPortal() {
     fetchCatalog();
   }, []);
 
-  // Search Logic: Shows tests and packages that match
-  const searchResults = search ? [...packages, ...individualTests].filter((item) => {
+  // Search Logic
+  const searchResults = search ? individualTests.filter((item) => {
     if (!item || !item.name) return false;
     return item.name.toLowerCase().includes(search.toLowerCase());
   }) : [];
@@ -159,7 +206,7 @@ function CustomerPortal() {
   return (
     <div className="min-h-screen bg-slate-50 font-sans pb-10">
       
-      {/* Restored Header Component */}
+      {/* HEADER */}
       <div className="bg-white py-8 border-b-4 border-blue-600 mb-8 shadow-sm">
         <div className="max-w-7xl mx-auto px-6 text-center">
           <h1 className="text-4xl font-extrabold text-blue-800 mb-2 tracking-tight">Sri Balaji Diagnostics</h1>
@@ -178,7 +225,7 @@ function CustomerPortal() {
         {/* LEFT COLUMN: Catalog (8 columns wide) */}
         <div className="xl:col-span-8 bg-white p-6 md:p-8 rounded-2xl shadow-sm border border-slate-100">
           
-          {/* Search Bar Restored */}
+          {/* Universal Search Bar */}
           <div className="relative mb-10">
             <span className="absolute left-5 top-4 text-xl">🔍</span>
             <input
@@ -226,10 +273,9 @@ function CustomerPortal() {
               <h2 className="text-2xl font-bold text-purple-900 mb-6 flex items-center">✨ Exclusive Health Packages</h2>
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {packages.length === 0 ? <p className="text-slate-500 italic">No packages available.</p> : packages.map((pkg, idx) => (
+                {packages.length === 0 ? <p className="text-slate-500 italic">No exclusive packages found.</p> : packages.map((pkg, idx) => (
                   <div key={idx} className="bg-white rounded-xl border border-purple-200 shadow-sm hover:shadow-md transition overflow-hidden relative flex flex-col">
                     
-                    {/* Special Offer Badge */}
                     <div className="absolute top-0 right-0 bg-rose-500 text-white text-xs font-bold px-4 py-1.5 rounded-bl-lg uppercase tracking-wider">
                       Special Offer
                     </div>
