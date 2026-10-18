@@ -15,11 +15,11 @@ const getTestKey = (t, idx) => {
 };
 
 // ==========================================
-// PDF GENERATION ENGINE
+// PDF GENERATION ENGINE (FINAL DOWNLOAD ONLY)
 // ==========================================
 const LOGO_BASE64 = "";
 
-const generatePDF = (patient, tests, results, useLetterhead, isPreview) => {
+const generatePDF = (patient, tests, results, useLetterhead) => {
   const docPdf = new jsPDF();
 
   if (useLetterhead) {
@@ -107,9 +107,6 @@ const generatePDF = (patient, tests, results, useLetterhead, isPreview) => {
   docPdf.setFontSize(8);
   docPdf.text("Electronically Verified Report", 146, finalY + 11);
 
-  if (isPreview) {
-    return docPdf.output("datauristring");
-  }
   docPdf.save(`${patient.clinicalId || "Report"}_${patient.name}.pdf`);
 };
 
@@ -142,15 +139,28 @@ function Staff() {
   const [activeSubgroup, setActiveSubgroup] = useState(null);
   const [staffSearch, setStaffSearch] = useState("");
 
-  // --- Processing & Editing State ---
+  // --- Processing, Preview & Full Modification State ---
   const [processingBooking, setProcessingBooking] = useState(null);
   const [results, setResults] = useState({});
-  const [previewPdf, setPreviewPdf] = useState(null);
+  const [showPreviewModal, setShowPreviewModal] = useState(false);
+
   const [editMode, setEditMode] = useState(false);
+  const [editPatient, setEditPatient] = useState({
+    name: "",
+    phone: "",
+    age: "",
+    gender: "Male",
+    doctorId: "",
+    date: "",
+    collectionType: "lab",
+    address: ""
+  });
   const [editableTests, setEditableTests] = useState([]);
-  const [additionalPayment, setAdditionalPayment] = useState({
-    cash: 0,
-    upi: 0
+  const [editPayment, setEditPayment] = useState({
+    cashPaid: 0,
+    upiPaid: 0,
+    discount: 0,
+    deliveryFee: 0
   });
 
   useEffect(() => {
@@ -248,7 +258,6 @@ function Staff() {
     const processItem = (item, parentPkgName) => {
       if (!item) return;
 
-      // 1. If the item directly contains a nested tests array, unpack each sub-test
       if (item.tests && Array.isArray(item.tests) && item.tests.length > 0) {
         item.tests.forEach((sub) =>
           processItem(sub, item.name || parentPkgName)
@@ -259,13 +268,11 @@ function Staff() {
       const rawName = (item.name || "").trim();
       if (!rawName) return;
 
-      // Strip parameter count suffixes like "Lipid Profile (5)" -> "lipid profile"
       const cleanNameLower = rawName
         .replace(/\(\d+\)/g, "")
         .trim()
         .toLowerCase();
 
-      // 2. Check if this item matches a Package in Firestore
       const matchedPkg = packages.find((p) => {
         const pName = (p.name || "").trim().toLowerCase();
         return pName === rawName.toLowerCase() || pName === cleanNameLower;
@@ -276,7 +283,6 @@ function Staff() {
         return;
       }
 
-      // 3. Check if this item matches a Test Category group in Firestore
       const matchedCat = categories.find((c) => {
         const cName = (c.categoryName || "").trim().toLowerCase();
         return cName === rawName.toLowerCase() || cName === cleanNameLower;
@@ -289,7 +295,6 @@ function Staff() {
         return;
       }
 
-      // 4. Individual parameter: enrich with refRange, unit, and unique ID
       const catalogMatch =
         testMap.get(rawName.toLowerCase()) || testMap.get(cleanNameLower);
       const uniqueKey = item.id ? String(item.id) : rawName;
@@ -307,7 +312,6 @@ function Staff() {
 
     rawItems.forEach((item) => processItem(item, ""));
 
-    // Deduplicate by parameter name while keeping order
     const uniqueTests = [];
     const seenNames = new Set();
     expanded.forEach((t) => {
@@ -353,11 +357,11 @@ function Staff() {
     const randomId = Math.floor(1000 + Math.random() * 9000);
     const clinicalId = `SBD-${dateStr}-${randomId}`;
 
-    // Recursively unpack all selected packages into individual test parameters
     const flatTests = expandToIndividualTests(selectedTests);
 
     await addDoc(collection(db, "bookings"), {
       ...patient,
+      referralDoctorId: patient.doctorId || "",
       clinicalId,
       tests: flatTests,
       cartItems: selectedTests,
@@ -410,77 +414,118 @@ function Staff() {
     fetchData();
   };
 
-  // --- Open Patient Record & Ensure Package Sub-tests Are Unpacked ---
-  const openPatientRecord = (b) => {
+  // --- Populate Full Edit State ---
+  const populateEditState = (b) => {
+    setEditPatient({
+      name: b.name || "",
+      phone: b.phone || "",
+      age: b.age || "",
+      gender: b.gender || "Male",
+      doctorId: b.doctorId || b.referralDoctorId || "",
+      date: b.date || new Date().toISOString().slice(0, 10),
+      collectionType: b.collectionType || "lab",
+      address: b.address || ""
+    });
+    const currentCart =
+      b.cartItems && b.cartItems.length > 0 ? b.cartItems : b.tests || [];
+    setEditableTests(currentCart);
+    setEditPayment({
+      cashPaid: Number(b.cashPaid || 0),
+      upiPaid: Number(b.upiPaid || 0),
+      discount: Number(b.discount || 0),
+      deliveryFee: Number(b.deliveryFee || 0)
+    });
+  };
+
+  // --- Open Patient Record ---
+  const openPatientRecord = (b, startInEditMode) => {
     const rawSource =
       b.tests && b.tests.length > 0 ? b.tests : b.cartItems || [];
     const unpackedTests = expandToIndividualTests(rawSource);
 
-    setProcessingBooking({
+    const updatedBooking = {
       ...b,
       tests: unpackedTests
-    });
+    };
+
+    setProcessingBooking(updatedBooking);
     setResults(b.results || {});
-    setEditMode(false);
+    populateEditState(updatedBooking);
+    setEditMode(Boolean(startInEditMode));
   };
 
-  // --- Billing Editing ---
   const openEditMode = () => {
-    const currentCart =
-      processingBooking.cartItems || processingBooking.tests || [];
-    setEditableTests(currentCart);
-    setAdditionalPayment({ cash: 0, upi: 0 });
+    if (!processingBooking) return;
+    populateEditState(processingBooking);
     setEditMode(true);
   };
 
-  const handleUpdateBilling = async () => {
+  // --- Save Full Record Modifications (Demographics + Referral + Tests + Billing) ---
+  const handleUpdateRecord = async () => {
+    if (!editPatient.name) {
+      return alert("Patient Name is required.");
+    }
+    if (editableTests.length === 0) {
+      return alert("At least one test or package is required.");
+    }
+
     const newSubtotal = editableTests.reduce(
       (sum, t) => sum + Number(t.discountedPrice || t.price || 0),
       0
     );
-    const newTotal =
-      newSubtotal -
-      (processingBooking.discount || 0) +
-      (processingBooking.deliveryFee || 0);
+    const newDiscount = Number(editPayment.discount || 0);
+    const newDeliveryFee =
+      editPatient.collectionType === "home"
+        ? Number(editPayment.deliveryFee || 0)
+        : 0;
+    const newTotal = newSubtotal - newDiscount + newDeliveryFee;
 
-    const newCash =
-      Number(processingBooking.cashPaid || 0) + Number(additionalPayment.cash);
-    const newUpi =
-      Number(processingBooking.upiPaid || 0) + Number(additionalPayment.upi);
+    const newCash = Number(editPayment.cashPaid || 0);
+    const newUpi = Number(editPayment.upiPaid || 0);
     const newBalance = newTotal - (newCash + newUpi);
 
     const newFlatTests = expandToIndividualTests(editableTests);
 
     const logEntry = {
-      action: `Modified Billing & Tests (New Total: ₹${newTotal})`,
+      action: `Modified Record Details, Tests & Billing (Patient: ${editPatient.name}, Total: ₹${newTotal})`,
       by: user.email,
       time: new Date().toISOString()
     };
 
-    await updateDoc(doc(db, "bookings", processingBooking.id), {
+    const updatedFields = {
+      name: editPatient.name,
+      phone: editPatient.phone,
+      age: editPatient.age,
+      gender: editPatient.gender,
+      doctorId: editPatient.doctorId,
+      referralDoctorId: editPatient.doctorId,
+      date: editPatient.date,
+      collectionType: editPatient.collectionType,
+      address: editPatient.collectionType === "home" ? editPatient.address : "",
       cartItems: editableTests,
       tests: newFlatTests,
       subtotal: newSubtotal,
+      discount: newDiscount,
+      deliveryFee: newDeliveryFee,
       total: newTotal,
       cashPaid: newCash,
       upiPaid: newUpi,
-      balanceDue: newBalance,
+      balanceDue: newBalance
+    };
+
+    await updateDoc(doc(db, "bookings", processingBooking.id), {
+      ...updatedFields,
       history: arrayUnion(logEntry)
     });
 
     setProcessingBooking({
       ...processingBooking,
-      cartItems: editableTests,
-      tests: newFlatTests,
-      subtotal: newSubtotal,
-      total: newTotal,
-      cashPaid: newCash,
-      upiPaid: newUpi,
-      balanceDue: newBalance
+      ...updatedFields
     });
 
     setEditMode(false);
     fetchData();
+    alert("Patient details, tests, and billing updated successfully.");
   };
 
   // --- Result Finalization ---
@@ -503,26 +548,15 @@ function Staff() {
     fetchData();
   };
 
-  const openPreview = () => {
-    const matchedDoc = referrals.find(
-      (r) => r.id === processingBooking.doctorId
-    );
-    const docName = matchedDoc ? matchedDoc.doctorName : "Self Walk-in";
-    const currentTests = processingBooking.tests || [];
-
-    const dataUri = generatePDF(
-      { ...processingBooking, doctorName: docName },
-      currentTests,
-      results,
-      true,
-      true
-    );
-    setPreviewPdf(dataUri);
+  const getDoctorName = (b) => {
+    if (!b) return "Self Walk-in";
+    const docId = b.doctorId || b.referralDoctorId;
+    const matchedDoc = referrals.find((r) => r.id === docId);
+    return matchedDoc ? matchedDoc.doctorName : "Self Walk-in";
   };
 
   const downloadFinalPDF = async (b) => {
-    const matchedDoc = referrals.find((r) => r.id === b.doctorId);
-    const docName = matchedDoc ? matchedDoc.doctorName : "Self Walk-in";
+    const docName = getDoctorName(b);
     const currentTests = expandToIndividualTests(b.tests || b.cartItems || []);
     const currentResults = b.results || {};
 
@@ -530,8 +564,7 @@ function Staff() {
       { ...b, doctorName: docName },
       currentTests,
       currentResults,
-      true,
-      false
+      true
     );
 
     const downloadLog = {
@@ -556,7 +589,7 @@ function Staff() {
 
   const unlockRecord = async (b) => {
     const msg =
-      "Unlock this record? This will move it back to the Lab Desk and allow modifications.";
+      "Unlock this record? This will move it back to the Lab Desk so you can modify patient details, tests, billing, and results.";
     if (!window.confirm(msg)) return;
 
     const unpackedTests = expandToIndividualTests(b.tests || b.cartItems || []);
@@ -571,9 +604,9 @@ function Staff() {
       })
     });
 
-    setProcessingBooking({ ...b, tests: unpackedTests });
-    setResults(b.results || {});
+    const unlockedBooking = { ...b, status: "processing", tests: unpackedTests };
     setActiveView("processing");
+    openPatientRecord(unlockedBooking, true);
     fetchData();
   };
 
@@ -1185,7 +1218,8 @@ function Staff() {
                         <td className="p-4 font-semibold text-slate-800">
                           {b.name}
                           <span className="text-xs font-normal text-slate-400 block">
-                            {b.age || "?"}Y / {b.gender || "?"}
+                            {b.age || "?"}Y / {b.gender || "?"} |{" "}
+                            {b.phone || "No Phone"}
                           </span>
                         </td>
                         <td className="p-4 text-xs text-slate-600 max-w-xs truncate">
@@ -1195,7 +1229,7 @@ function Staff() {
                         </td>
                         <td className="p-4 text-right">
                           <button
-                            onClick={() => openPatientRecord(b)}
+                            onClick={() => openPatientRecord(b, false)}
                             className="bg-emerald-100 hover:bg-emerald-200 text-emerald-800 px-4 py-2 rounded font-bold transition"
                           >
                             Open Record
@@ -1210,7 +1244,7 @@ function Staff() {
           )}
 
           {/* ========================================== */}
-          {/* VIEW 3B: RESULT ENTRY & EDIT BILLING       */}
+          {/* VIEW 3B: RESULT ENTRY & FULL MODIFICATION  */}
           {/* ========================================== */}
           {activeView === "processing" && processingBooking && (
             <div className="animate-fade-in">
@@ -1219,13 +1253,19 @@ function Staff() {
                   <h2 className="text-2xl font-bold text-slate-800">
                     {processingBooking.name}
                   </h2>
-                  <div className="flex flex-wrap gap-4 mt-2 text-sm font-medium text-slate-600">
+                  <div className="flex flex-wrap gap-3 mt-2 text-sm font-medium text-slate-600">
                     <span className="bg-white px-2 py-1 rounded border">
                       ID: {processingBooking.clinicalId}
+                    </span>
+                    <span className="bg-white px-2 py-1 rounded border">
+                      Phone: {processingBooking.phone || "N/A"}
                     </span>
                     <span className="bg-amber-100 text-amber-800 px-2 py-1 rounded border border-amber-200">
                       Demographics: {processingBooking.age || "N/A"} Years,{" "}
                       {processingBooking.gender || "N/A"}
+                    </span>
+                    <span className="bg-blue-50 text-blue-800 px-2 py-1 rounded border border-blue-200">
+                      Ref: {getDoctorName(processingBooking)}
                     </span>
                     <span
                       className={`px-2 py-1 rounded border ${
@@ -1250,21 +1290,177 @@ function Staff() {
                       onClick={openEditMode}
                       className="text-emerald-700 font-bold border border-emerald-200 bg-emerald-50 px-4 py-2 rounded shadow-sm text-sm"
                     >
-                      ⚙️ Modify Tests & Billing
+                      ⚙️ Modify Patient, Tests & Billing
                     </button>
                   )}
                 </div>
               </div>
 
+              {/* FULL RECORD MODIFICATION PANEL */}
               {editMode && (
                 <div className="mb-6 border-2 border-emerald-400 bg-emerald-50 rounded-lg p-5 shadow-inner">
-                  <h3 className="font-bold text-emerald-800 mb-4">
-                    Modify Patient Tests & Update Billing
+                  <h3 className="font-bold text-emerald-900 mb-4 text-base border-b border-emerald-200 pb-2">
+                    Modify Patient Demographics, Referral, Tests & Billing
                   </h3>
+
+                  {/* 1. Patient Demographics & Referral Fields */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6 bg-white p-4 rounded border">
+                    <div>
+                      <label className="text-xs font-bold text-slate-500 block mb-1">
+                        PATIENT FULL NAME
+                      </label>
+                      <input
+                        type="text"
+                        value={editPatient.name}
+                        onChange={(e) =>
+                          setEditPatient({
+                            ...editPatient,
+                            name: e.target.value
+                          })
+                        }
+                        className="w-full p-2 border rounded text-sm outline-none focus:border-emerald-500"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-xs font-bold text-slate-500 block mb-1">
+                        PHONE NUMBER
+                      </label>
+                      <input
+                        type="tel"
+                        value={editPatient.phone}
+                        onChange={(e) =>
+                          setEditPatient({
+                            ...editPatient,
+                            phone: e.target.value
+                          })
+                        }
+                        className="w-full p-2 border rounded text-sm outline-none focus:border-emerald-500"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="text-xs font-bold text-slate-500 block mb-1">
+                          AGE (YRS)
+                        </label>
+                        <input
+                          type="number"
+                          value={editPatient.age}
+                          onChange={(e) =>
+                            setEditPatient({
+                              ...editPatient,
+                              age: e.target.value
+                            })
+                          }
+                          className="w-full p-2 border rounded text-sm outline-none focus:border-emerald-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs font-bold text-slate-500 block mb-1">
+                          GENDER
+                        </label>
+                        <select
+                          value={editPatient.gender}
+                          onChange={(e) =>
+                            setEditPatient({
+                              ...editPatient,
+                              gender: e.target.value
+                            })
+                          }
+                          className="w-full p-2 border rounded text-sm outline-none focus:border-emerald-500"
+                        >
+                          <option>Male</option>
+                          <option>Female</option>
+                          <option>Child</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="text-xs font-bold text-slate-500 block mb-1">
+                        REFERRING DOCTOR
+                      </label>
+                      <select
+                        value={editPatient.doctorId}
+                        onChange={(e) =>
+                          setEditPatient({
+                            ...editPatient,
+                            doctorId: e.target.value
+                          })
+                        }
+                        className="w-full p-2 border rounded text-sm outline-none focus:border-emerald-500 bg-slate-50"
+                      >
+                        <option value="">No Referral (Self Walk-in)</option>
+                        {referrals.map((r) => (
+                          <option key={r.id} value={r.id}>
+                            {r.doctorName}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="text-xs font-bold text-slate-500 block mb-1">
+                        DATE
+                      </label>
+                      <input
+                        type="date"
+                        value={editPatient.date}
+                        onChange={(e) =>
+                          setEditPatient({
+                            ...editPatient,
+                            date: e.target.value
+                          })
+                        }
+                        className="w-full p-2 border rounded text-sm outline-none focus:border-emerald-500"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-xs font-bold text-slate-500 block mb-1">
+                        COLLECTION TYPE
+                      </label>
+                      <select
+                        value={editPatient.collectionType}
+                        onChange={(e) =>
+                          setEditPatient({
+                            ...editPatient,
+                            collectionType: e.target.value
+                          })
+                        }
+                        className="w-full p-2 border rounded text-sm outline-none focus:border-emerald-500"
+                      >
+                        <option value="lab">Lab Visit</option>
+                        <option value="home">Home Collection</option>
+                      </select>
+                    </div>
+
+                    {editPatient.collectionType === "home" && (
+                      <div className="md:col-span-3">
+                        <label className="text-xs font-bold text-slate-500 block mb-1">
+                          HOME COLLECTION ADDRESS
+                        </label>
+                        <input
+                          type="text"
+                          value={editPatient.address}
+                          onChange={(e) =>
+                            setEditPatient({
+                              ...editPatient,
+                              address: e.target.value
+                            })
+                          }
+                          className="w-full p-2 border rounded text-sm outline-none focus:border-emerald-500"
+                        />
+                      </div>
+                    )}
+                  </div>
+
+                  {/* 2. Tests & Financial Adjustments */}
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                     <div>
                       <label className="text-xs font-bold text-slate-500 mb-1 block">
-                        ADD NEW TESTS
+                        ADD OR REMOVE TESTS & PACKAGES
                       </label>
                       <select
                         onChange={(e) => {
@@ -1275,7 +1471,7 @@ function Staff() {
                             setEditableTests([...editableTests, t]);
                           }
                         }}
-                        className="w-full p-2 border rounded text-sm outline-none mb-4"
+                        className="w-full p-2 border rounded text-sm outline-none mb-4 bg-white"
                       >
                         <option value="">
                           Search & Add Any Test or Package...
@@ -1288,13 +1484,18 @@ function Staff() {
                         ))}
                       </select>
 
-                      <div className="space-y-1 max-h-40 overflow-y-auto pr-2">
+                      <div className="space-y-1 max-h-48 overflow-y-auto pr-2">
                         {editableTests.map((t, idx) => (
                           <div
                             key={idx}
                             className="flex justify-between items-center bg-white border p-2 rounded text-sm"
                           >
-                            <span>{t.name}</span>
+                            <span>
+                              {t.name}{" "}
+                              <span className="text-xs text-slate-500 font-bold">
+                                (₹{t.discountedPrice || t.price || 0})
+                              </span>
+                            </span>
                             <button
                               onClick={() =>
                                 setEditableTests(
@@ -1311,39 +1512,18 @@ function Staff() {
                     </div>
 
                     <div className="bg-white p-4 rounded border shadow-sm">
-                      <div className="flex justify-between text-sm font-bold text-slate-800 mb-2">
-                        <span>New Adjusted Total:</span>
-                        <span>
-                          ₹
-                          {editableTests.reduce(
-                            (sum, t) =>
-                              sum + Number(t.discountedPrice || t.price || 0),
-                            0
-                          ) -
-                            (processingBooking.discount || 0) +
-                            (processingBooking.deliveryFee || 0)}
-                        </span>
-                      </div>
-                      <div className="flex justify-between text-sm text-emerald-600 mb-4 pb-4 border-b">
-                        <span>Already Paid:</span>
-                        <span>
-                          ₹
-                          {Number(processingBooking.cashPaid || 0) +
-                            Number(processingBooking.upiPaid || 0)}
-                        </span>
-                      </div>
                       <div className="grid grid-cols-2 gap-4 mb-4">
                         <div>
                           <label className="text-xs font-bold text-slate-500">
-                            NEW CASH TENDERED
+                            TOTAL CASH PAID (₹)
                           </label>
                           <input
                             type="number"
-                            value={additionalPayment.cash}
+                            value={editPayment.cashPaid}
                             onChange={(e) =>
-                              setAdditionalPayment({
-                                ...additionalPayment,
-                                cash: e.target.value
+                              setEditPayment({
+                                ...editPayment,
+                                cashPaid: e.target.value
                               })
                             }
                             className="w-full p-2 border rounded font-medium outline-none mt-1"
@@ -1351,21 +1531,82 @@ function Staff() {
                         </div>
                         <div>
                           <label className="text-xs font-bold text-slate-500">
-                            NEW UPI / CARD
+                            TOTAL UPI / CARD PAID (₹)
                           </label>
                           <input
                             type="number"
-                            value={additionalPayment.upi}
+                            value={editPayment.upiPaid}
                             onChange={(e) =>
-                              setAdditionalPayment({
-                                ...additionalPayment,
-                                upi: e.target.value
+                              setEditPayment({
+                                ...editPayment,
+                                upiPaid: e.target.value
                               })
                             }
                             className="w-full p-2 border rounded font-medium outline-none mt-1"
                           />
                         </div>
+                        <div>
+                          <label className="text-xs font-bold text-slate-500">
+                            DISCOUNT AMOUNT (₹)
+                          </label>
+                          <input
+                            type="number"
+                            value={editPayment.discount}
+                            onChange={(e) =>
+                              setEditPayment({
+                                ...editPayment,
+                                discount: e.target.value
+                              })
+                            }
+                            className="w-full p-2 border rounded font-medium outline-none mt-1"
+                          />
+                        </div>
+                        {editPatient.collectionType === "home" && (
+                          <div>
+                            <label className="text-xs font-bold text-slate-500">
+                              HOME VISIT FEE (₹)
+                            </label>
+                            <input
+                              type="number"
+                              value={editPayment.deliveryFee}
+                              onChange={(e) =>
+                                setEditPayment({
+                                  ...editPayment,
+                                  deliveryFee: e.target.value
+                                })
+                              }
+                              className="w-full p-2 border rounded font-medium outline-none mt-1"
+                            />
+                          </div>
+                        )}
                       </div>
+
+                      <div className="border-t pt-3 mb-4 space-y-1 text-sm">
+                        <div className="flex justify-between font-bold text-slate-800">
+                          <span>Adjusted Grand Total:</span>
+                          <span>
+                            ₹
+                            {editableTests.reduce(
+                              (sum, t) =>
+                                sum + Number(t.discountedPrice || t.price || 0),
+                              0
+                            ) -
+                              Number(editPayment.discount || 0) +
+                              (editPatient.collectionType === "home"
+                                ? Number(editPayment.deliveryFee || 0)
+                                : 0)}
+                          </span>
+                        </div>
+                        <div className="flex justify-between font-bold text-emerald-700">
+                          <span>Total Paid (Cash + UPI):</span>
+                          <span>
+                            ₹
+                            {Number(editPayment.cashPaid || 0) +
+                              Number(editPayment.upiPaid || 0)}
+                          </span>
+                        </div>
+                      </div>
+
                       <div className="flex gap-2">
                         <button
                           onClick={() => setEditMode(false)}
@@ -1374,10 +1615,10 @@ function Staff() {
                           Cancel
                         </button>
                         <button
-                          onClick={handleUpdateBilling}
-                          className="flex-1 py-2 bg-emerald-600 text-white rounded font-bold shadow-sm"
+                          onClick={handleUpdateRecord}
+                          className="flex-1 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded font-bold shadow-sm"
                         >
-                          Save Updated Bill
+                          Save All Modifications
                         </button>
                       </div>
                     </div>
@@ -1489,10 +1730,10 @@ function Staff() {
 
               <div className="flex gap-4">
                 <button
-                  onClick={openPreview}
+                  onClick={() => setShowPreviewModal(true)}
                   className="flex-1 py-4 bg-white text-slate-800 rounded font-bold border-2 border-slate-300 hover:border-slate-800 shadow-sm"
                 >
-                  👀 Preview Document
+                  👀 Preview Document (Read-Only)
                 </button>
                 <button
                   onClick={saveResults}
@@ -1550,6 +1791,10 @@ function Staff() {
                           </td>
                           <td className="p-4 font-semibold text-slate-800">
                             {b.name}
+                            <span className="block text-xs font-normal text-slate-500">
+                              {b.age || "N/A"}Y / {b.gender || "N/A"} |{" "}
+                              {b.phone || "N/A"}
+                            </span>
                           </td>
                           <td className="p-4">
                             {b.reportGenerated ? (
@@ -1597,33 +1842,169 @@ function Staff() {
           )}
 
           {/* ========================================== */}
-          {/* PDF PREVIEW MODAL                          */}
+          {/* READ-ONLY HTML PREVIEW MODAL (NO DOWNLOAD/PRINT) */}
           {/* ========================================== */}
-          {previewPdf && (
-            <div className="fixed inset-0 bg-slate-900/90 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
-              <div className="bg-slate-100 rounded-lg w-full max-w-5xl h-[95vh] flex flex-col shadow-2xl overflow-hidden">
+          {showPreviewModal && processingBooking && (
+            <div
+              onContextMenu={(e) => e.preventDefault()}
+              className="fixed inset-0 bg-slate-900/90 flex items-center justify-center z-50 p-4 backdrop-blur-sm select-none"
+            >
+              <div className="bg-slate-200 rounded-lg w-full max-w-4xl h-[92vh] flex flex-col shadow-2xl overflow-hidden">
                 <div className="p-4 bg-white border-b flex justify-between items-center shadow-sm z-10">
                   <div>
                     <h2 className="font-bold text-lg text-slate-800">
-                      Quality Assurance Preview
+                      Quality Assurance Preview (View-Only)
                     </h2>
                     <p className="text-xs text-slate-500">
-                      Check for typos before finalizing. (Download disabled in
-                      preview mode).
+                      Printing and downloading are disabled in preview mode.
+                      Finalize the report first to generate the official PDF.
                     </p>
                   </div>
                   <button
-                    onClick={() => setPreviewPdf(null)}
-                    className="text-slate-500 hover:text-red-600 hover:bg-red-50 border px-4 py-2 rounded font-bold transition"
+                    onClick={() => setShowPreviewModal(false)}
+                    className="text-slate-600 hover:text-red-600 hover:bg-red-50 border px-4 py-2 rounded font-bold transition"
                   >
                     Close Preview
                   </button>
                 </div>
-                <iframe
-                  src={previewPdf}
-                  className="flex-1 w-full bg-slate-300"
-                  title="PDF Preview"
-                />
+
+                {/* Locked A4 Sheet Replica */}
+                <div className="flex-1 overflow-y-auto p-6 md:p-10">
+                  <div className="bg-white max-w-3xl mx-auto p-8 md:p-12 shadow-lg border border-slate-300 min-h-[840px] flex flex-col justify-between">
+                    <div>
+                      {/* Letterhead */}
+                      <div className="text-center border-b-2 border-slate-300 pb-4 mb-6">
+                        <h1 className="text-2xl font-extrabold text-slate-900 tracking-wide">
+                          SRI BALAJI DIAGNOSTICS
+                        </h1>
+                        <p className="text-xs text-slate-500 mt-1">
+                          123 Health Avenue, Medical District | Ph: +91 98765
+                          43210
+                        </p>
+                      </div>
+
+                      {/* Patient Demographics */}
+                      <div className="grid grid-cols-2 gap-4 text-xs text-slate-800 mb-6 bg-slate-50 p-4 rounded border">
+                        <div className="space-y-1.5">
+                          <p>
+                            <span className="font-bold">Patient Name:</span>{" "}
+                            {processingBooking.name}
+                          </p>
+                          <p>
+                            <span className="font-bold">Age / Gender:</span>{" "}
+                            {processingBooking.age || "N/A"} Yrs /{" "}
+                            {processingBooking.gender || "N/A"}
+                          </p>
+                          <p>
+                            <span className="font-bold">Contact:</span>{" "}
+                            {processingBooking.phone || "Walk-in"}
+                          </p>
+                        </div>
+                        <div className="space-y-1.5">
+                          <p>
+                            <span className="font-bold">Clinical ID:</span>{" "}
+                            {processingBooking.clinicalId || "N/A"}
+                          </p>
+                          <p>
+                            <span className="font-bold">Date:</span>{" "}
+                            {processingBooking.date}
+                          </p>
+                          <p>
+                            <span className="font-bold">Ref Doctor:</span>{" "}
+                            {getDoctorName(processingBooking)}
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Results Table */}
+                      <table className="w-full text-left text-xs border border-slate-300">
+                        <thead className="bg-slate-900 text-white">
+                          <tr>
+                            <th className="p-2.5 border border-slate-700">
+                              Test Description
+                            </th>
+                            <th className="p-2.5 border border-slate-700">
+                              Result Value
+                            </th>
+                            <th className="p-2.5 border border-slate-700">
+                              Flag
+                            </th>
+                            <th className="p-2.5 border border-slate-700">
+                              Reference Range
+                            </th>
+                            <th className="p-2.5 border border-slate-700">
+                              Unit
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-200">
+                          {(processingBooking.tests || []).map((t, idx) => {
+                            const key = getTestKey(t, idx);
+                            const res = (results &&
+                              (results[key] || results[t.name])) || {
+                              value: "-",
+                              flag: "Normal"
+                            };
+                            const isAbnormal =
+                              res.flag === "High" ||
+                              res.flag === "Low" ||
+                              res.flag === "Critical";
+
+                            return (
+                              <tr key={key}>
+                                <td className="p-2.5 border border-slate-200 font-medium text-slate-800">
+                                  {t.name}
+                                  {t.parentPackage ? (
+                                    <span className="text-[10px] text-slate-500 ml-1">
+                                      ({t.parentPackage})
+                                    </span>
+                                  ) : null}
+                                </td>
+                                <td
+                                  className={`p-2.5 border border-slate-200 ${
+                                    isAbnormal
+                                      ? "text-red-600 font-bold"
+                                      : "text-slate-800"
+                                  }`}
+                                >
+                                  {res.value || "-"}
+                                </td>
+                                <td
+                                  className={`p-2.5 border border-slate-200 ${
+                                    isAbnormal
+                                      ? "text-red-600 font-bold"
+                                      : "text-slate-500"
+                                  }`}
+                                >
+                                  {res.flag === "Normal" ? "" : res.flag}
+                                </td>
+                                <td className="p-2.5 border border-slate-200 font-mono text-slate-600">
+                                  {t.refRange || "-"}
+                                </td>
+                                <td className="p-2.5 border border-slate-200 text-slate-600">
+                                  {t.unit || ""}
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+
+                    {/* Signature Block */}
+                    <div className="mt-16 pt-8 flex justify-end">
+                      <div className="text-center">
+                        <div className="w-48 border-b border-slate-800 mb-1"></div>
+                        <p className="text-xs font-bold text-slate-800">
+                          Chief Pathologist
+                        </p>
+                        <p className="text-[10px] text-slate-500">
+                          Electronically Verified Report
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           )}
