@@ -424,13 +424,17 @@ export function LabDeskTab({
               </label>
               <select
                 onChange={(e) => {
-                  const t = allCatalogItems.find(
-                    (x) => x.name === e.target.value
-                  );
-                  if (t) {
-                    setEditableTests([...editableTests, t]);
-                  }
-                }}
+                const val = e.target.value;
+                const autoFlag = evaluateAutoFlag(val, t.refRange);
+                setResults({
+                ...results,
+                [testKey]: {
+                ...resObj,
+                value: val,
+                  flag: autoFlag
+                      }
+                   });
+                 }}
                 className="w-full p-2 border rounded text-sm outline-none mb-4 bg-white"
               >
                 <option value="">Search & Add Any Test or Package...</option>
