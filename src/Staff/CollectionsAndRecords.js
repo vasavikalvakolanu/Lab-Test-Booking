@@ -1,7 +1,7 @@
-import React from "react";
+import React, { useState } from "react";
 import { updateDoc, doc, arrayUnion } from "firebase/firestore";
 import { db } from "../firebase";
-import { generatePDF } from "./staffUtils";
+import { generatePDF, generateBillPDF } from "./staffUtils";
 
 export function CollectionsTab({
   pendingBookings,
@@ -66,12 +66,18 @@ export function CollectionsTab({
                 <td className="p-4 text-xs text-slate-600 max-w-xs truncate">
                   {(b.cartItems || b.tests || []).map((t) => t.name).join(", ")}
                 </td>
-                <td className="p-4 text-right">
+                <td className="p-4 text-right space-x-2">
+                  <button
+                    onClick={() => generateBillPDF(b)}
+                    className="bg-white border border-slate-300 text-slate-700 px-3 py-2 rounded font-bold text-xs hover:bg-slate-50"
+                  >
+                    🧾 Bill PDF
+                  </button>
                   <button
                     onClick={() => markSampleCollected(b)}
                     className="bg-amber-500 hover:bg-amber-600 text-white px-4 py-2 rounded font-bold transition shadow-sm"
                   >
-                    Verify & Collect Sample
+                    Verify &amp; Collect Sample
                   </button>
                 </td>
               </tr>
@@ -91,7 +97,28 @@ export function PastRecordsTab({
   fetchData,
   onUnlockRecord
 }) {
+  const [recordSearch, setRecordSearch] = useState("");
+  const [recordDate, setRecordDate] = useState("");
+
+  const filteredRecords = (pastRecords || []).filter((b) => {
+    const q = recordSearch.toLowerCase();
+    const matchText =
+      !q ||
+      (b.name && b.name.toLowerCase().includes(q)) ||
+      (b.phone && b.phone.includes(q)) ||
+      (b.clinicalId && b.clinicalId.toLowerCase().includes(q));
+    const matchDate = !recordDate || b.date === recordDate;
+    return matchText && matchDate;
+  });
+
   const downloadFinalPDF = async (b) => {
+    if (Number(b.balanceDue || 0) > 0) {
+      const proceed = window.confirm(
+        `⚠️ UNPAID BALANCE ALERT: This patient still has a pending balance of ₹${b.balanceDue}.\n\nDo you still want to download the final report?`
+      );
+      if (!proceed) return;
+    }
+
     const docName = getDoctorName(b);
     const currentTests = expandTests(b.tests || b.cartItems || []);
     const currentResults = b.results || {};
@@ -150,88 +177,155 @@ export function PastRecordsTab({
   };
 
   return (
-    <div className="overflow-hidden rounded border border-slate-200">
-      <table className="w-full text-left text-sm">
-        <thead className="bg-slate-100 border-b border-slate-200">
-          <tr>
-            <th className="p-4 font-bold text-slate-600">ID / Date</th>
-            <th className="p-4 font-bold text-slate-600">Patient</th>
-            <th className="p-4 font-bold text-slate-600">Status</th>
-            <th className="p-4 text-right">Actions</th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-slate-100">
-          {pastRecords.length === 0 ? (
+    <div>
+      {/* Search & Date Filter Bar */}
+      <div className="flex flex-wrap gap-3 mb-4 bg-slate-50 p-3 rounded-lg border">
+        <input
+          type="text"
+          placeholder="Search by Patient Name, Phone, or Clinical ID (SBD-...)..."
+          value={recordSearch}
+          onChange={(e) => setRecordSearch(e.target.value)}
+          className="flex-1 min-w-[220px] p-2 border rounded text-sm outline-none focus:border-emerald-500 bg-white"
+        />
+        <input
+          type="date"
+          value={recordDate}
+          onChange={(e) => setRecordDate(e.target.value)}
+          className="p-2 border rounded text-sm outline-none focus:border-emerald-500 bg-white"
+        />
+        {(recordSearch || recordDate) && (
+          <button
+            onClick={() => {
+              setRecordSearch("");
+              setRecordDate("");
+            }}
+            className="px-3 py-2 bg-white border rounded text-xs font-bold text-slate-600 hover:bg-slate-100"
+          >
+            Clear Filters
+          </button>
+        )}
+      </div>
+
+      <div className="overflow-hidden rounded border border-slate-200">
+        <table className="w-full text-left text-sm">
+          <thead className="bg-slate-100 border-b border-slate-200">
             <tr>
-              <td colSpan="4" className="p-8 text-center text-slate-400">
-                No completed records yet.
-              </td>
+              <th className="p-4 font-bold text-slate-600">ID / Date</th>
+              <th className="p-4 font-bold text-slate-600">Patient</th>
+              <th className="p-4 font-bold text-slate-600">Billing</th>
+              <th className="p-4 font-bold text-slate-600">Report Status</th>
+              <th className="p-4 text-right">Actions</th>
             </tr>
-          ) : (
-            pastRecords.map((b) => {
-              const logList = b.downloadLogs || [];
-              const downloadTooltip = logList
-                .map(
-                  (log) =>
-                    `${log.by} at ${new Date(log.time).toLocaleString()}`
-                )
-                .join(" | ");
+          </thead>
+          <tbody className="divide-y divide-slate-100">
+            {filteredRecords.length === 0 ? (
+              <tr>
+                <td colSpan="5" className="p-8 text-center text-slate-400">
+                  No matching completed records found.
+                </td>
+              </tr>
+            ) : (
+              filteredRecords.map((b) => {
+                const logList = b.downloadLogs || [];
+                const downloadTooltip = logList
+                  .map(
+                    (log) =>
+                      `${log.by} at ${new Date(log.time).toLocaleString()}`
+                  )
+                  .join(" | ");
 
-              return (
-                <tr key={b.id} className="hover:bg-slate-50">
-                  <td className="p-4 font-mono text-slate-500">
-                    <span className="block font-bold">{b.clinicalId}</span>
-                    {b.date}
-                  </td>
-                  <td className="p-4 font-semibold text-slate-800">
-                    {b.name}
-                    <span className="block text-xs font-normal text-slate-500">
-                      {b.age || "N/A"}Y / {b.gender || "N/A"} |{" "}
-                      {b.phone || "N/A"}
-                    </span>
-                  </td>
-                  <td className="p-4">
-                    {b.reportGenerated ? (
-                      <span className="text-xs bg-emerald-100 text-emerald-800 px-2 py-1 rounded font-bold border border-emerald-200">
-                        ✅ Generated by {b.reportGeneratedBy}
+                return (
+                  <tr key={b.id} className="hover:bg-slate-50">
+                    <td className="p-4 font-mono text-slate-500">
+                      <span className="block font-bold text-slate-800">
+                        {b.clinicalId}
                       </span>
-                    ) : (
-                      <span className="text-xs bg-amber-100 text-amber-800 px-2 py-1 rounded font-bold border border-amber-200">
-                        ⏳ Pending Generation
+                      {b.date}
+                    </td>
+                    <td className="p-4 font-semibold text-slate-800">
+                      {b.name}
+                      <span className="block text-xs font-normal text-slate-500">
+                        {b.age || "N/A"}Y / {b.gender || "N/A"} |{" "}
+                        {b.phone || "N/A"}
                       </span>
-                    )}
-
-                    {logList.length > 0 && (
-                      <div className="mt-2 text-xs text-slate-500">
-                        <span
-                          className="font-bold underline cursor-help"
-                          title={downloadTooltip}
-                        >
-                          Downloaded {logList.length} time(s)
+                    </td>
+                    <td className="p-4">
+                      <span className="font-bold text-slate-800 block">
+                        ₹{b.total || 0}
+                      </span>
+                      {Number(b.balanceDue || 0) > 0 ? (
+                        <span className="text-[11px] font-bold text-red-600 bg-red-50 px-1.5 py-0.5 rounded border border-red-200">
+                          Due: ₹{b.balanceDue}
                         </span>
+                      ) : (
+                        <span className="text-[11px] font-bold text-emerald-700">
+                          Paid in Full
+                        </span>
+                      )}
+                    </td>
+                    <td className="p-4">
+                      {b.reportGenerated ? (
+                        <span className="text-xs bg-emerald-100 text-emerald-800 px-2 py-1 rounded font-bold border border-emerald-200">
+                          ✅ Generated by {b.reportGeneratedBy}
+                        </span>
+                      ) : (
+                        <span className="text-xs bg-amber-100 text-amber-800 px-2 py-1 rounded font-bold border border-amber-200">
+                          ⏳ Pending Generation
+                        </span>
+                      )}
+
+                      {logList.length > 0 && (
+                        <div className="mt-1.5 text-xs text-slate-500">
+                          <span
+                            className="font-bold underline cursor-help"
+                            title={downloadTooltip}
+                          >
+                            Downloaded {logList.length} time(s)
+                          </span>
+                        </div>
+                      )}
+                    </td>
+                    <td className="p-4 text-right">
+                      <div className="flex flex-wrap justify-end gap-1.5">
+                        <button
+                          onClick={() => generateBillPDF(b)}
+                          className="bg-white border text-slate-700 hover:bg-slate-100 px-2.5 py-1.5 rounded text-xs font-bold transition"
+                        >
+                          🧾 Bill
+                        </button>
+                        {b.phone && (
+                          <a
+                            href={`https://wa.me/91${b.phone.replace(/\D/g, "")}?text=${encodeURIComponent(
+                              `Hello ${b.name}, your lab report (ID:${b.clinicalId}) at Sri Balaji Diagnostics is ready.`
+                            )}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="bg-emerald-50 border border-emerald-200 text-emerald-700 hover:bg-emerald-100 px-2.5 py-1.5 rounded text-xs font-bold transition"
+                          >
+                            WhatsApp
+                          </a>
+                        )}
+                        <button
+                          onClick={() => handleUnlock(b)}
+                          className="bg-white border text-slate-600 hover:bg-slate-100 px-2.5 py-1.5 rounded text-xs font-bold transition"
+                        >
+                          Unlock &amp; Modify
+                        </button>
+                        <button
+                          onClick={() => downloadFinalPDF(b)}
+                          className="bg-slate-800 hover:bg-slate-900 text-white px-3 py-1.5 rounded text-xs font-bold transition shadow-sm"
+                        >
+                          Download PDF
+                        </button>
                       </div>
-                    )}
-                  </td>
-                  <td className="p-4 text-right flex justify-end gap-2">
-                    <button
-                      onClick={() => handleUnlock(b)}
-                      className="bg-white border text-slate-600 hover:bg-slate-100 px-3 py-1.5 rounded font-bold transition"
-                    >
-                      Unlock & Modify
-                    </button>
-                    <button
-                      onClick={() => downloadFinalPDF(b)}
-                      className="bg-slate-800 hover:bg-slate-900 text-white px-3 py-1.5 rounded font-bold transition shadow-sm"
-                    >
-                      Download PDF
-                    </button>
-                  </td>
-                </tr>
-              );
-            })
-          )}
-        </tbody>
-      </table>
+                    </td>
+                  </tr>
+                );
+              })
+            )}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
