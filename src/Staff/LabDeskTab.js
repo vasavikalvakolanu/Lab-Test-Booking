@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { updateDoc, doc, arrayUnion } from "firebase/firestore";
 import { db } from "../firebase";
 import { getTestKey } from "./staffUtils";
+import { getTestKey, evaluateAutoFlag } from "./staffUtils";
 
 export function LabDeskTab({
   processingBookings,
