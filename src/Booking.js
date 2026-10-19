@@ -24,6 +24,7 @@ function Booking() {
   });
 
   const [cart, setCart] = useState([]);
+  const [logoError, setLogoError] = useState(false);
 
   useEffect(() => {
     const fetchCatalog = async () => {
@@ -75,14 +76,25 @@ function Booking() {
 
   return (
     <div className="min-h-screen bg-[#f4f6fb] font-sans py-6 px-4 md:px-8">
-      {/* Clinic Hero Header */}
-      <div className="max-w-7xl mx-auto bg-white rounded-2xl shadow-sm border-t-4 border-blue-600 p-6 md:p-8 mb-8 text-center">
-        <h1 className="text-3xl md:text-4xl font-extrabold text-[#153e90] tracking-tight mb-2">
-          Sri Balaji Diagnostics
-        </h1>
-        <p className="text-slate-600 font-medium text-base md:text-lg mb-5">
-          Professional Lab Tests &amp; Home Collection
-        </p>
+      {/* Clinic Hero Header with /logo.png support */}
+      <div className="max-w-7xl mx-auto bg-white rounded-2xl shadow-sm border-t-4 border-[#0f2d4a] p-6 md:p-8 mb-8 text-center">
+        {!logoError ? (
+          <img
+            src="/logo.png"
+            alt="Sri Balaji Clinical Laboratory"
+            onError={() => setLogoError(true)}
+            className="h-24 md:h-28 w-auto mx-auto mb-3 object-contain"
+          />
+        ) : (
+          <>
+            <h1 className="text-3xl md:text-4xl font-extrabold text-[#153e90] tracking-tight mb-2">
+              Sri Balaji Clinical Laboratory
+            </h1>
+            <p className="text-slate-600 font-medium text-base md:text-lg mb-5">
+              Professional Lab Tests &amp; Home Collection
+            </p>
+          </>
+        )}
 
         <div className="inline-flex flex-col md:flex-row items-center justify-center gap-3 md:gap-6 bg-slate-50 border border-slate-200 px-6 py-2.5 rounded-full text-sm text-slate-700">
           <span className="flex items-center gap-1.5">
