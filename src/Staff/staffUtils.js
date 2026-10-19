@@ -2,9 +2,6 @@ import React, { useState } from "react";
 import jsPDF from "jspdf";
 import "jspdf-autotable";
 
-// =========================================================
-// FALLBACK CIRCULAR EMBLEM SVG (USED IF PNG NOT UPLOADED YET)
-// =========================================================
 const FALLBACK_CREST_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" width="400" height="400">
   <circle cx="200" cy="200" r="186" fill="#ffffff" stroke="#0f2d4a" stroke-width="14" />
   <circle cx="200" cy="200" r="156" fill="#ffffff" stroke="#c59b46" stroke-width="5" />
@@ -20,19 +17,19 @@ const FALLBACK_CREST_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0
   <path d="M200 344 L214 368 L200 392 L186 368 Z" fill="#cfa349" />
 </svg>`;
 
-// =========================================================
-// SAFE BASE64 ASSET PRELOADER (/public/letterhead.png & /logo.png)
-// =========================================================
 let letterheadDataUrl = null;
 let logoDataUrl = null;
-let logoAspect = 2.4;
+let logoWatermarkDataUrl = null;
 let fallbackCrestDataUrl = null;
 let fallbackWatermarkDataUrl = null;
 
 const convertImgToDataUrl = (img, alpha = 1.0, maxDim = 1600) => {
   try {
     const canvas = document.createElement("canvas");
-    const scale = Math.min(1, maxDim / Math.max(img.naturalWidth, img.naturalHeight));
+    const scale = Math.min(
+      1,
+      maxDim / Math.max(img.naturalWidth, img.naturalHeight)
+    );
     canvas.width = Math.round(img.naturalWidth * scale);
     canvas.height = Math.round(img.naturalHeight * scale);
     const ctx = canvas.getContext("2d");
@@ -45,7 +42,6 @@ const convertImgToDataUrl = (img, alpha = 1.0, maxDim = 1600) => {
 };
 
 if (typeof window !== "undefined") {
-  // 1. Preload /letterhead.png
   const lhImg = new window.Image();
   lhImg.crossOrigin = "Anonymous";
   lhImg.onload = () => {
@@ -55,18 +51,16 @@ if (typeof window !== "undefined") {
   };
   lhImg.src = "/letterhead.png";
 
-  // 2. Preload /logo.png
   const lgImg = new window.Image();
   lgImg.crossOrigin = "Anonymous";
   lgImg.onload = () => {
     if (lgImg.naturalWidth > 50) {
-      logoAspect = lgImg.naturalWidth / (lgImg.naturalHeight || 1);
-      logoDataUrl = convertImgToDataUrl(lgImg, 1.0, 1200);
+      logoDataUrl = convertImgToDataUrl(lgImg, 1.0, 600);
+      logoWatermarkDataUrl = convertImgToDataUrl(lgImg, 0.06, 600);
     }
   };
   lgImg.src = "/logo.png";
 
-  // 3. Preload fallback SVG crest
   const svgImg = new window.Image();
   const svgBlob = new Blob([FALLBACK_CREST_SVG], {
     type: "image/svg+xml;charset=utf-8"
@@ -80,12 +74,9 @@ if (typeof window !== "undefined") {
   svgImg.src = svgUrl;
 }
 
-// =========================================================
-// REACT COMPONENT FOR UI HEADERS & PREVIEWS
-// =========================================================
 export function SriBalajiLogoSVG({ size = 80, width, className = "" }) {
   const [imgFailed, setImgFailed] = useState(false);
-  const finalWidth = width || size;
+  const finalSize = width || size;
 
   if (!imgFailed) {
     return (
@@ -93,7 +84,7 @@ export function SriBalajiLogoSVG({ size = 80, width, className = "" }) {
         src="/logo.png"
         alt="Sri Balaji Clinical Laboratory"
         onError={() => setImgFailed(true)}
-        style={{ height: `${finalWidth}px`, width: "auto" }}
+        style={{ width: `${finalSize}px`, height: `${finalSize}px` }}
         className={`object-contain inline-block shrink-0 ${className}`}
       />
     );
@@ -101,7 +92,7 @@ export function SriBalajiLogoSVG({ size = 80, width, className = "" }) {
 
   return (
     <div
-      style={{ width: finalWidth, height: finalWidth }}
+      style={{ width: finalSize, height: finalSize }}
       className={`inline-block shrink-0 ${className}`}
       dangerouslySetInnerHTML={{
         __html: FALLBACK_CREST_SVG.replace(
@@ -129,39 +120,32 @@ export const drawSriBalajiLetterhead = (docPdf, useLetterhead = true) => {
     }
   }
 
-  // Priority 2: "/logo.png" horizontal banner centered at top (no duplicate title text)
-  if (logoDataUrl) {
+  // Priority 2: Circular "/logo.png" emblem + SRI BALAJI CLINICAL LABORATORY text
+  const activeCrest = logoDataUrl || fallbackCrestDataUrl;
+  const activeWatermark = logoWatermarkDataUrl || fallbackWatermarkDataUrl;
+
+  if (activeWatermark) {
     try {
-      const bannerHeight = 28;
-      const bannerWidth = Math.min(130, bannerHeight * logoAspect);
-      const bannerX = (210 - bannerWidth) / 2;
-      docPdf.addImage(logoDataUrl, "PNG", bannerX, 8, bannerWidth, bannerHeight);
+      docPdf.addImage(activeWatermark, "PNG", 61, 105, 88, 88);
     } catch (e) {}
-
-    if (fallbackWatermarkDataUrl) {
-      docPdf.addImage(fallbackWatermarkDataUrl, "PNG", 61, 105, 88, 88);
-    }
-  } else {
-    // Priority 3: Built-in vector crest + typography fallback
-    if (fallbackWatermarkDataUrl) {
-      docPdf.addImage(fallbackWatermarkDataUrl, "PNG", 61, 105, 88, 88);
-    }
-    if (fallbackCrestDataUrl) {
-      docPdf.addImage(fallbackCrestDataUrl, "PNG", 46, 9, 26, 26);
-    }
-
-    docPdf.setFont("times", "bold");
-    docPdf.setFontSize(26);
-    docPdf.setTextColor(15, 45, 74);
-    docPdf.text("SRI BALAJI", 76, 21);
-
-    docPdf.setFont("helvetica", "bold");
-    docPdf.setFontSize(12);
-    docPdf.setTextColor(19, 106, 148);
-    docPdf.text("CLINICAL LABORATORY", 76.5, 28);
   }
 
-  // Ornamental Divider & Contact Bar (used when full letterhead.png is not loaded)
+  if (activeCrest) {
+    try {
+      docPdf.addImage(activeCrest, "PNG", 44, 8, 27, 27);
+    } catch (e) {}
+  }
+
+  docPdf.setFont("times", "bold");
+  docPdf.setFontSize(26);
+  docPdf.setTextColor(15, 45, 74);
+  docPdf.text("SRI BALAJI", 75, 21);
+
+  docPdf.setFont("helvetica", "bold");
+  docPdf.setFontSize(12);
+  docPdf.setTextColor(19, 106, 148);
+  docPdf.text("CLINICAL LABORATORY", 75.5, 28);
+
   docPdf.setDrawColor(15, 45, 74);
   docPdf.setLineWidth(0.5);
   docPdf.line(14, 39, 102, 39);
@@ -181,7 +165,6 @@ export const drawSriBalajiLetterhead = (docPdf, useLetterhead = true) => {
     { align: "center" }
   );
 
-  // Bottom Footer
   docPdf.setDrawColor(15, 45, 74);
   docPdf.setLineWidth(1.1);
   docPdf.line(0, 286.5, 52, 286.5);
@@ -204,9 +187,6 @@ export const getTestKey = (t, idx) => {
   return "test_" + idx;
 };
 
-// ==========================================
-// AUTO-FLAGGING PARSER FOR LAB TECHNICIANS
-// ==========================================
 export const evaluateAutoFlag = (rawValue, refRange) => {
   if (rawValue === "" || rawValue === null || rawValue === undefined) {
     return "Normal";
@@ -377,11 +357,10 @@ export const expandToIndividualTests = (
 export const generatePDF = (patient, tests, results, useLetterhead = true) => {
   const docPdf = new jsPDF();
 
-  // Draw Letterhead on Page 1 BEFORE any content
   drawSriBalajiLetterhead(docPdf, useLetterhead);
 
-  // 60mm clears the entire top header + address line of letterhead.png
-  const startY = useLetterhead ? 60 : 20;
+  // 62mm gives clean spacing below the letterhead contact line
+  const startY = useLetterhead ? 62 : 20;
 
   docPdf.setDrawColor(203, 213, 225);
   docPdf.setLineWidth(0.3);
@@ -440,7 +419,7 @@ export const generatePDF = (patient, tests, results, useLetterhead = true) => {
 
   docPdf.autoTable({
     startY: startY + 20,
-    margin: { top: 60, bottom: 30, left: 14, right: 14 },
+    margin: { top: 62, bottom: 30, left: 14, right: 14 },
     head: [
       ["Test Description", "Result Value", "Flag", "Reference Range", "Unit"]
     ],
@@ -454,7 +433,6 @@ export const generatePDF = (patient, tests, results, useLetterhead = true) => {
       lineWidth: 0.2
     },
     willDrawPage: function (data) {
-      // Draw letterhead BEFORE table rows on Page 2+ so it stays behind text
       if (data.pageNumber > 1 && useLetterhead) {
         drawSriBalajiLetterhead(docPdf, true);
       }
@@ -505,37 +483,36 @@ export const generateBillPDF = (booking) => {
 
   drawSriBalajiLetterhead(docPdf, true);
 
-  // Start at 60mm so it sits cleanly below the letterhead contact line
   docPdf.setFont("helvetica", "bold");
   docPdf.setFontSize(11.5);
   docPdf.setTextColor(15, 45, 74);
-  docPdf.text("PATIENT BILL / PAYMENT RECEIPT", 105, 60, { align: "center" });
+  docPdf.text("PATIENT BILL / PAYMENT RECEIPT", 105, 62, { align: "center" });
 
   docPdf.setDrawColor(203, 213, 225);
   docPdf.setLineWidth(0.3);
-  docPdf.roundedRect(14, 63, 182, 20, 2, 2, "S");
+  docPdf.roundedRect(14, 65, 182, 20, 2, 2, "S");
 
   docPdf.setFont("helvetica", "bold");
   docPdf.setFontSize(9.5);
   docPdf.setTextColor(15, 45, 74);
-  docPdf.text(`Patient Name : ${booking.name || "N/A"}`, 18, 68.5);
+  docPdf.text(`Patient Name : ${booking.name || "N/A"}`, 18, 70.5);
   docPdf.text(
     `Age / Gender : ${booking.age || "N/A"} Yrs / ${booking.gender || "N/A"}`,
     18,
-    74.5
+    76.5
   );
-  docPdf.text(`Phone        : ${booking.phone || "N/A"}`, 18, 80.5);
+  docPdf.text(`Phone        : ${booking.phone || "N/A"}`, 18, 82.5);
 
   docPdf.text(
     `Receipt / ID : ${booking.clinicalId || booking.bookingRef || "N/A"}`,
     120,
-    68.5
+    70.5
   );
-  docPdf.text(`Date         : ${booking.date || "N/A"}`, 120, 74.5);
+  docPdf.text(`Date         : ${booking.date || "N/A"}`, 120, 76.5);
   docPdf.text(
     `Collection   : ${booking.collectionType === "home" ? "Home Visit" : "Lab Visit"}`,
     120,
-    80.5
+    82.5
   );
 
   const items =
@@ -550,8 +527,8 @@ export const generateBillPDF = (booking) => {
   ]);
 
   docPdf.autoTable({
-    startY: 87,
-    margin: { top: 60, bottom: 30, left: 14, right: 14 },
+    startY: 89,
+    margin: { top: 62, bottom: 30, left: 14, right: 14 },
     head: [["#", "Test / Health Package Description", "Amount"]],
     body: bodyData,
     theme: "grid",
