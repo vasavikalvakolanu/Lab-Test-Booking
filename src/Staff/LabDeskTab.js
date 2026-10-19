@@ -1,7 +1,11 @@
 import React, { useState, useEffect } from "react";
 import { updateDoc, doc, arrayUnion } from "firebase/firestore";
 import { db } from "../firebase";
-import { getTestKey, evaluateAutoFlag } from "./staffUtils";
+import {
+  getTestKey,
+  evaluateAutoFlag,
+  SriBalajiLogoSVG
+} from "./staffUtils";
 
 export function LabDeskTab({
   processingBookings,
@@ -701,6 +705,7 @@ export function LabDeskTab({
         </button>
       </div>
 
+      {/* READ-ONLY HTML PREVIEW MODAL WITH NEW LETTERHEAD & WATERMARK */}
       {showPreviewModal && (
         <div
           onContextMenu={(e) => e.preventDefault()}
@@ -726,52 +731,87 @@ export function LabDeskTab({
             </div>
 
             <div className="flex-1 overflow-y-auto p-6 md:p-10">
-              <div className="bg-white max-w-3xl mx-auto p-8 md:p-12 shadow-lg border border-slate-300 min-h-[840px] flex flex-col justify-between">
-                <div>
-                  <div className="text-center border-b-2 border-slate-300 pb-4 mb-6">
-                    <h1 className="text-2xl font-extrabold text-slate-900 tracking-wide">
-                      SRI BALAJI DIAGNOSTICS
-                    </h1>
-                    <p className="text-xs text-slate-500 mt-1">
-                      Sathiraju complex, Main road, Kothapeta | Ph: +91
-                      9849923729
-                    </p>
+              <div className="bg-white max-w-3xl mx-auto shadow-lg border border-slate-300 min-h-[920px] flex flex-col justify-between relative overflow-hidden">
+                {/* CENTER WATERMARK */}
+                <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-10">
+                  <SriBalajiLogoSVG size={360} />
+                </div>
+
+                <div className="p-8 md:p-10 relative z-10">
+                  {/* NEW LETTERHEAD HEADER */}
+                  <div className="flex items-center justify-center gap-4 mb-3">
+                    <SriBalajiLogoSVG size={78} />
+                    <div className="text-left">
+                      <h1 className="text-3xl md:text-4xl font-serif font-extrabold text-[#0f2d4a] tracking-wide leading-none">
+                        SRI BALAJI
+                      </h1>
+                      <p className="text-sm md:text-base font-extrabold text-[#0d5c85] tracking-[0.18em] mt-1">
+                        CLINICAL LABORATORY
+                      </p>
+                    </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4 text-xs text-slate-800 mb-6 bg-slate-50 p-4 rounded border">
+                  {/* Ornamental Gold & Navy Diamond Divider */}
+                  <div className="flex items-center justify-center my-2">
+                    <div className="h-[2px] flex-1 bg-gradient-to-r from-transparent via-[#0f2d4a] to-[#c59b46]"></div>
+                    <span className="text-[#c59b46] mx-2 text-sm leading-none">
+                      ◆
+                    </span>
+                    <div className="h-[2px] flex-1 bg-gradient-to-l from-transparent via-[#0f2d4a] to-[#c59b46]"></div>
+                  </div>
+
+                  {/* Contact Line */}
+                  <p className="text-center text-[11px] font-semibold text-[#0f2d4a] mb-6">
+                    Sathiraju Complex, Main Road, Kothapeta &bull; Ph: +91
+                    9849923729 &bull; Email: prasad balajilab@gmail.com
+                  </p>
+
+                  {/* Patient Demographics */}
+                  <div className="grid grid-cols-2 gap-4 text-xs text-slate-800 mb-6 bg-slate-50/85 p-4 rounded border border-slate-300">
                     <div className="space-y-1.5">
                       <p>
-                        <span className="font-bold">Patient Name:</span>{" "}
+                        <span className="font-bold text-[#0f2d4a]">
+                          Patient Name:
+                        </span>{" "}
                         {processingBooking.name}
                       </p>
                       <p>
-                        <span className="font-bold">Age / Gender:</span>{" "}
+                        <span className="font-bold text-[#0f2d4a]">
+                          Age / Gender:
+                        </span>{" "}
                         {processingBooking.age || "N/A"} Yrs /{" "}
                         {processingBooking.gender || "N/A"}
                       </p>
                       <p>
-                        <span className="font-bold">Contact:</span>{" "}
+                        <span className="font-bold text-[#0f2d4a]">
+                          Contact:
+                        </span>{" "}
                         {processingBooking.phone || "Walk-in"}
                       </p>
                     </div>
                     <div className="space-y-1.5">
                       <p>
-                        <span className="font-bold">Clinical ID:</span>{" "}
+                        <span className="font-bold text-[#0f2d4a]">
+                          Clinical ID:
+                        </span>{" "}
                         {processingBooking.clinicalId || "N/A"}
                       </p>
                       <p>
-                        <span className="font-bold">Date:</span>{" "}
+                        <span className="font-bold text-[#0f2d4a]">Date:</span>{" "}
                         {processingBooking.date}
                       </p>
                       <p>
-                        <span className="font-bold">Ref Doctor:</span>{" "}
+                        <span className="font-bold text-[#0f2d4a]">
+                          Ref Doctor:
+                        </span>{" "}
                         {getDoctorName(processingBooking)}
                       </p>
                     </div>
                   </div>
 
+                  {/* Results Table */}
                   <table className="w-full text-left text-xs border border-slate-300">
-                    <thead className="bg-slate-900 text-white">
+                    <thead className="bg-[#0f2d4a] text-white">
                       <tr>
                         <th className="p-2.5 border border-slate-700">
                           Test Description
@@ -840,16 +880,30 @@ export function LabDeskTab({
                   </table>
                 </div>
 
-                <div className="mt-16 pt-8 flex justify-end">
-                  <div className="text-center">
-                    <div className="w-48 border-b border-slate-800 mb-1"></div>
-                    <p className="text-xs font-bold text-slate-800">
-                      Authorized Signatory
-                    </p>
-                    <p className="text-[10px] text-slate-500">
-                      Electronically Verified Report
-                    </p>
+                {/* SIGNATURE & LETTERHEAD FOOTER */}
+                <div className="relative z-10">
+                  <div className="px-10 pb-6 flex justify-end">
+                    <div className="text-center">
+                      <div className="w-48 border-b border-[#0f2d4a] mb-1"></div>
+                      <p className="text-xs font-bold text-[#0f2d4a]">
+                        Authorized Signatory
+                      </p>
+                      <p className="text-[10px] text-slate-500">
+                        Sri Balaji Clinical Laboratory
+                      </p>
+                    </div>
                   </div>
+
+                  {/* TRUST • ACCURACY • CARE Footer */}
+                  <div className="flex items-center gap-4 mb-2">
+                    <div className="h-1 flex-1 bg-[#0f2d4a]"></div>
+                    <span className="text-xs font-extrabold tracking-[0.2em] text-[#0f2d4a]">
+                      TRUST &bull; ACCURACY &bull; CARE
+                    </span>
+                    <div className="h-1 flex-1 bg-[#0f2d4a]"></div>
+                  </div>
+                  <div className="h-1.5 w-full bg-[#c59b46]"></div>
+                  <div className="h-3 w-full bg-[#0f2d4a]"></div>
                 </div>
               </div>
             </div>
