@@ -8,12 +8,17 @@ const getLocalToday = () => {
   return new Date(now.getTime() - offset).toISOString().slice(0, 10);
 };
 
-export function AdminDashboard({ bookings, userEmail, fetchData }) {
+export function AdminDashboard({
+  bookings,
+  liveBookings,
+  userEmail,
+  fetchData
+}) {
   const [dashboardDate, setDashboardDate] = useState(getLocalToday());
 
-  const allBookings = bookings || [];
+  // Compatible with both `bookings` and `liveBookings` props
+  const allBookings = bookings || liveBookings || [];
 
-  // Bookings for the selected date (for daily revenue KPIs)
   const dateBookings = allBookings.filter((b) => b.date === dashboardDate);
 
   const totalBilledToday = dateBookings.reduce(
@@ -29,20 +34,29 @@ export function AdminDashboard({ bookings, userEmail, fetchData }) {
     0
   );
 
-  // Pending reports for selected date
   const pendingReports = dateBookings.filter(
     (b) => b.status !== "completed" && b.status !== "done"
   );
 
-  // ALL unresolved payments across all active/completed records on selected date
-  const pendingPayments = dateBookings.filter(
-    (b) => Number(b.balanceDue || 0) > 0
-  );
+  const pendingPayments = dateBookings.filter((b) => {
+    const total = Number(b.total || b.subtotal || 0);
+    const paid = Number(b.cashPaid || 0) + Number(b.upiPaid || 0);
+    const due =
+      b.balanceDue !== undefined && b.balanceDue !== null
+        ? Number(b.balanceDue)
+        : Math.max(0, total - paid);
+    return due > 0;
+  });
 
-  const totalPendingDuesToday = pendingPayments.reduce(
-    (sum, b) => sum + Number(b.balanceDue || 0),
-    0
-  );
+  const totalPendingDuesToday = pendingPayments.reduce((sum, b) => {
+    const total = Number(b.total || b.subtotal || 0);
+    const paid = Number(b.cashPaid || 0) + Number(b.upiPaid || 0);
+    const due =
+      b.balanceDue !== undefined && b.balanceDue !== null
+        ? Number(b.balanceDue)
+        : Math.max(0, total - paid);
+    return sum + due;
+  }, 0);
 
   const resolveReport = async (booking) => {
     if (!window.confirm(`Mark report for ${booking.name} as Completed?`)) return;
@@ -59,7 +73,13 @@ export function AdminDashboard({ bookings, userEmail, fetchData }) {
   };
 
   const resolvePayment = async (booking, mode) => {
-    const due = Number(booking.balanceDue || 0);
+    const total = Number(booking.total || booking.subtotal || 0);
+    const paid = Number(booking.cashPaid || 0) + Number(booking.upiPaid || 0);
+    const due =
+      booking.balanceDue !== undefined && booking.balanceDue !== null
+        ? Number(booking.balanceDue)
+        : Math.max(0, total - paid);
+
     if (
       !window.confirm(
         `Clear balance of ₹${due} for ${booking.name} via ${mode.toUpperCase()}?`
@@ -92,7 +112,6 @@ export function AdminDashboard({ bookings, userEmail, fetchData }) {
 
   return (
     <div className="space-y-8">
-      {/* Date Filter Bar */}
       <div className="bg-white p-4 rounded-xl border shadow-sm flex flex-wrap justify-between items-center gap-4">
         <div>
           <h2 className="text-lg font-bold text-slate-800">
@@ -122,7 +141,6 @@ export function AdminDashboard({ bookings, userEmail, fetchData }) {
         </div>
       </div>
 
-      {/* 4 Financial & Operational KPI Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="bg-white p-5 rounded-xl border shadow-sm">
           <span className="text-xs font-bold text-slate-400 uppercase">
@@ -161,7 +179,6 @@ export function AdminDashboard({ bookings, userEmail, fetchData }) {
         </div>
       </div>
 
-      {/* Pending Reports Section */}
       <div className="bg-white rounded-xl border border-red-200 shadow-sm overflow-hidden">
         <div className="bg-red-50 p-4 border-b border-red-200 flex justify-between items-center">
           <h2 className="text-base font-bold text-red-800">
@@ -216,7 +233,6 @@ export function AdminDashboard({ bookings, userEmail, fetchData }) {
         </div>
       </div>
 
-      {/* Pending Payments Section */}
       <div className="bg-white rounded-xl border border-amber-200 shadow-sm overflow-hidden">
         <div className="bg-amber-50 p-4 border-b border-amber-200 flex justify-between items-center">
           <h2 className="text-base font-bold text-amber-900">
@@ -234,45 +250,54 @@ export function AdminDashboard({ bookings, userEmail, fetchData }) {
             </p>
           ) : (
             <div className="space-y-3">
-              {pendingPayments.map((b) => (
-                <div
-                  key={b.id}
-                  className="flex flex-wrap justify-between items-center gap-4 p-4 border rounded-lg bg-slate-50"
-                >
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <h3 className="font-bold text-slate-800">{b.name}</h3>
-                      <span className="text-xs font-mono text-slate-600 bg-white px-2 py-0.5 border rounded">
-                        {b.clinicalId || b.bookingRef || "No ID"}
-                      </span>
-                      <span className="text-xs text-slate-500">
-                        ({b.phone || "Walk-in"})
-                      </span>
+              {pendingPayments.map((b) => {
+                const total = Number(b.total || b.subtotal || 0);
+                const paid =
+                  Number(b.cashPaid || 0) + Number(b.upiPaid || 0);
+                const due =
+                  b.balanceDue !== undefined && b.balanceDue !== null
+                    ? Number(b.balanceDue)
+                    : Math.max(0, total - paid);
+
+                return (
+                  <div
+                    key={b.id}
+                    className="flex flex-wrap justify-between items-center gap-4 p-4 border rounded-lg bg-slate-50"
+                  >
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h3 className="font-bold text-slate-800">{b.name}</h3>
+                        <span className="text-xs font-mono text-slate-600 bg-white px-2 py-0.5 border rounded">
+                          {b.clinicalId || b.bookingRef || "No ID"}
+                        </span>
+                        <span className="text-xs text-slate-500">
+                          ({b.phone || "Walk-in"})
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-600 mt-1">
+                        Total: <b>₹{total}</b> | Paid: ₹{paid} |{" "}
+                        <span className="text-red-600 font-bold">
+                          Balance Due: ₹{due}
+                        </span>
+                      </p>
                     </div>
-                    <p className="text-xs text-slate-600 mt-1">
-                      Total: <b>₹{b.total}</b> | Paid: ₹
-                      {Number(b.cashPaid || 0) + Number(b.upiPaid || 0)} |{" "}
-                      <span className="text-red-600 font-bold">
-                        Balance Due: ₹{b.balanceDue}
-                      </span>
-                    </p>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => resolvePayment(b, "cash")}
+                        className="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-2 rounded-lg text-xs font-bold shadow-sm transition"
+                      >
+                        Settle via Cash
+                      </button>
+                      <button
+                        onClick={() => resolvePayment(b, "upi")}
+                        className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-lg text-xs font-bold shadow-sm transition"
+                      >
+                        Settle via UPI
+                      </button>
+                    </div>
                   </div>
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => resolvePayment(b, "cash")}
-                      className="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-2 rounded-lg text-xs font-bold shadow-sm transition"
-                    >
-                      Settle via Cash
-                    </button>
-                    <button
-                      onClick={() => resolvePayment(b, "upi")}
-                      className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-lg text-xs font-bold shadow-sm transition"
-                    >
-                      Settle via UPI
-                    </button>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
