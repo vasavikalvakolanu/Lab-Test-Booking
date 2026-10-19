@@ -23,6 +23,7 @@ export function LabDeskTab({
 }) {
   const [results, setResults] = useState({});
   const [showPreviewModal, setShowPreviewModal] = useState(false);
+  const [letterheadBgFailed, setLetterheadBgFailed] = useState(false);
   const [editMode, setEditMode] = useState(false);
 
   const [editPatient, setEditPatient] = useState({
@@ -705,7 +706,7 @@ export function LabDeskTab({
         </button>
       </div>
 
-      {/* READ-ONLY HTML PREVIEW MODAL WITH NEW LETTERHEAD & WATERMARK */}
+      {/* READ-ONLY HTML PREVIEW MODAL MATCHING /letterhead.png */}
       {showPreviewModal && (
         <div
           onContextMenu={(e) => e.preventDefault()}
@@ -731,43 +732,38 @@ export function LabDeskTab({
             </div>
 
             <div className="flex-1 overflow-y-auto p-6 md:p-10">
-              <div className="bg-white max-w-3xl mx-auto shadow-lg border border-slate-300 min-h-[920px] flex flex-col justify-between relative overflow-hidden">
-                {/* CENTER WATERMARK */}
-                <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-10">
-                  <SriBalajiLogoSVG size={360} />
-                </div>
+              <div className="bg-white max-w-3xl mx-auto shadow-lg border border-slate-300 min-h-[1050px] flex flex-col justify-between relative overflow-hidden">
+                {/* Use /letterhead.png as full A4 background if available */}
+                {!letterheadBgFailed && (
+                  <img
+                    src="/letterhead.png"
+                    alt=""
+                    onError={() => setLetterheadBgFailed(true)}
+                    className="absolute inset-0 w-full h-full object-fill pointer-events-none z-0"
+                  />
+                )}
 
-                <div className="p-8 md:p-10 relative z-10">
-                  {/* NEW LETTERHEAD HEADER */}
-                  <div className="flex items-center justify-center gap-4 mb-3">
-                    <SriBalajiLogoSVG size={78} />
-                    <div className="text-left">
-                      <h1 className="text-3xl md:text-4xl font-serif font-extrabold text-[#0f2d4a] tracking-wide leading-none">
-                        SRI BALAJI
-                      </h1>
-                      <p className="text-sm md:text-base font-extrabold text-[#0d5c85] tracking-[0.18em] mt-1">
-                        CLINICAL LABORATORY
+                <div
+                  className={`px-8 md:px-10 relative z-10 ${
+                    !letterheadBgFailed ? "pt-52 pb-24" : "pt-8 pb-16"
+                  }`}
+                >
+                  {/* Fallback Header ONLY if /letterhead.png is not uploaded */}
+                  {letterheadBgFailed && (
+                    <div className="mb-6">
+                      <div className="flex justify-center mb-3">
+                        <SriBalajiLogoSVG size={95} />
+                      </div>
+                      <div className="h-[2px] w-full bg-gradient-to-r from-transparent via-[#0f2d4a] to-transparent my-2"></div>
+                      <p className="text-center text-[11px] font-semibold text-[#0f2d4a]">
+                        Sathiraju Complex, Main Road, Kothapeta &bull; Ph: +91
+                        9849923729 &bull; Email: prasad balajilab@gmail.com
                       </p>
                     </div>
-                  </div>
+                  )}
 
-                  {/* Ornamental Gold & Navy Diamond Divider */}
-                  <div className="flex items-center justify-center my-2">
-                    <div className="h-[2px] flex-1 bg-gradient-to-r from-transparent via-[#0f2d4a] to-[#c59b46]"></div>
-                    <span className="text-[#c59b46] mx-2 text-sm leading-none">
-                      ◆
-                    </span>
-                    <div className="h-[2px] flex-1 bg-gradient-to-l from-transparent via-[#0f2d4a] to-[#c59b46]"></div>
-                  </div>
-
-                  {/* Contact Line */}
-                  <p className="text-center text-[11px] font-semibold text-[#0f2d4a] mb-6">
-                    Sathiraju Complex, Main Road, Kothapeta &bull; Ph: +91
-                    9849923729 &bull; Email: prasad balajilab@gmail.com
-                  </p>
-
-                  {/* Patient Demographics */}
-                  <div className="grid grid-cols-2 gap-4 text-xs text-slate-800 mb-6 bg-slate-50/85 p-4 rounded border border-slate-300">
+                  {/* Patient Demographics Box */}
+                  <div className="grid grid-cols-2 gap-4 text-xs text-slate-800 mb-6 bg-white/90 p-4 rounded border border-slate-300">
                     <div className="space-y-1.5">
                       <p>
                         <span className="font-bold text-[#0f2d4a]">
@@ -880,30 +876,17 @@ export function LabDeskTab({
                   </table>
                 </div>
 
-                {/* SIGNATURE & LETTERHEAD FOOTER */}
-                <div className="relative z-10">
-                  <div className="px-10 pb-6 flex justify-end">
-                    <div className="text-center">
-                      <div className="w-48 border-b border-[#0f2d4a] mb-1"></div>
-                      <p className="text-xs font-bold text-[#0f2d4a]">
-                        Authorized Signatory
-                      </p>
-                      <p className="text-[10px] text-slate-500">
-                        Sri Balaji Clinical Laboratory
-                      </p>
-                    </div>
+                {/* Signature Block */}
+                <div className="relative z-10 pb-14 px-10 flex justify-end">
+                  <div className="text-center">
+                    <div className="w-48 border-b border-[#0f2d4a] mb-1"></div>
+                    <p className="text-xs font-bold text-[#0f2d4a]">
+                      Authorized Signatory
+                    </p>
+                    <p className="text-[10px] text-slate-500">
+                      Sri Balaji Clinical Laboratory
+                    </p>
                   </div>
-
-                  {/* TRUST • ACCURACY • CARE Footer */}
-                  <div className="flex items-center gap-4 mb-2">
-                    <div className="h-1 flex-1 bg-[#0f2d4a]"></div>
-                    <span className="text-xs font-extrabold tracking-[0.2em] text-[#0f2d4a]">
-                      TRUST &bull; ACCURACY &bull; CARE
-                    </span>
-                    <div className="h-1 flex-1 bg-[#0f2d4a]"></div>
-                  </div>
-                  <div className="h-1.5 w-full bg-[#c59b46]"></div>
-                  <div className="h-3 w-full bg-[#0f2d4a]"></div>
                 </div>
               </div>
             </div>
