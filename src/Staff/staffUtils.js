@@ -3,302 +3,260 @@ import jsPDF from "jspdf";
 import "jspdf-autotable";
 
 // =========================================================
-// AUTO-PRELOAD "/letterhead.png" IF UPLOADED TO /public
+// HIGH-PRECISION SVG MARKUP (NAMALU + MICROSCOPE + DNA + WREATH)
 // =========================================================
-let preloadedLetterhead = null;
-if (typeof window !== "undefined") {
-  const img = new window.Image();
-  img.crossOrigin = "Anonymous";
-  img.src = "/letterhead.png";
-  img.onload = () => {
-    preloadedLetterhead = img;
-  };
-}
+const DETAILED_LOGO_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" width="600" height="600">
+  <defs>
+    <clipPath id="innerCircleClip">
+      <circle cx="200" cy="200" r="154" />
+    </clipPath>
+  </defs>
 
-// =========================================================
-// REUSABLE SVG COMPONENT: NAMALU + MICROSCOPE + DNA LOGO
-// =========================================================
-export function SriBalajiLogoSVG({ size = 76, className = "" }) {
-  return (
-    <svg
-      width={size}
-      height={size}
-      viewBox="0 0 120 120"
-      fill="none"
-      xmlns="http://www.w3.org/2000/svg"
-      className={className}
-    >
-      {/* Outer Navy & Inner Gold Rings */}
-      <circle
-        cx="60"
-        cy="60"
-        r="56"
-        stroke="#0f2d4a"
-        strokeWidth="4"
-        fill="#ffffff"
-      />
-      <circle
-        cx="60"
-        cy="60"
-        r="49"
-        stroke="#c59b46"
-        strokeWidth="2"
-        fill="none"
-      />
+  <!-- Outer Navy Circle & Inner Gold Ring -->
+  <circle cx="200" cy="200" r="186" fill="#ffffff" stroke="#0f2d4a" stroke-width="14" />
+  <circle cx="200" cy="200" r="156" fill="#ffffff" stroke="#c59b46" stroke-width="4.5" />
 
-      {/* Teal Medical Cross Backdrop (Left/Center) */}
-      <path
-        d="M24 52 H48 V36 H62 V84 H36 V68 H24 Z"
-        fill="#136a94"
-        opacity="0.9"
-      />
+  <!-- Side Gold Accent Notches -->
+  <polygon points="44,200 56,191 52,200 56,209" fill="#c59b46" />
+  <polygon points="356,200 344,191 348,200 344,209" fill="#c59b46" />
 
-      {/* Top Golden Namalu (Tirunamam) */}
-      <path
-        d="M49 16 L52 36 C52 41 68 41 68 36 L71 16 L66 16 L64 33 C64 36 56 36 56 33 L54 16 Z"
-        fill="#c59b46"
-      />
-      <path
-        d="M60 18 C58 24 57 29 60 33 C63 29 62 24 60 18 Z"
-        fill="#d9a74a"
-      />
+  <!-- Top Crown Gold Drop -->
+  <circle cx="200" cy="40" r="12" fill="#ffffff" />
+  <path d="M200 24 C193 34, 192 43, 200 49 C208 43, 207 34, 200 24 Z" fill="#c59b46" />
 
-      {/* DNA Double Helix (Left) */}
-      <path
-        d="M32 34 C42 42, 28 56, 38 66 C46 74, 34 84, 44 90"
-        stroke="#0f2d4a"
-        strokeWidth="3"
-        strokeLinecap="round"
-        fill="none"
-      />
-      <path
-        d="M42 30 C32 40, 46 54, 34 64 C26 72, 42 82, 34 90"
-        stroke="#c59b46"
-        strokeWidth="3"
-        strokeLinecap="round"
-        fill="none"
-      />
+  <!-- Laurel Wreath Leaves (Left & Right Lower Rim) -->
+  <g fill="#0f2d4a">
+    <!-- Left Wreath -->
+    <path d="M54 255 C46 244, 52 232, 62 242 C60 250, 56 254, 54 255 Z" />
+    <path d="M65 278 C55 269, 60 256, 71 265 C70 273, 67 277, 65 278 Z" />
+    <path d="M80 300 C69 292, 73 279, 85 287 C84 295, 82 299, 80 300 Z" />
+    <path d="M98 320 C87 313, 90 300, 102 307 C102 315, 100 319, 98 320 Z" />
+    <path d="M120 337 C108 331, 111 318, 123 324 C123 332, 121 336, 120 337 Z" />
+    <path d="M144 350 C132 346, 134 333, 146 338 C147 345, 145 349, 144 350 Z" />
+    <path d="M170 359 C158 356, 159 344, 171 347 C172 354, 171 358, 170 359 Z" />
+    <!-- Right Wreath -->
+    <path d="M346 255 C354 244, 348 232, 338 242 C340 250, 344 254, 346 255 Z" />
+    <path d="M335 278 C345 269, 340 256, 329 265 C330 273, 333 277, 335 278 Z" />
+    <path d="M320 300 C331 292, 327 279, 315 287 C316 295, 318 299, 320 300 Z" />
+    <path d="M302 320 C313 313, 310 300, 298 307 C298 315, 300 319, 302 320 Z" />
+    <path d="M280 337 C292 331, 289 318, 277 324 C277 332, 279 336, 280 337 Z" />
+    <path d="M256 350 C268 346, 266 333, 254 338 C253 345, 255 349, 256 350 Z" />
+    <path d="M230 359 C242 356, 241 344, 229 347 C228 354, 229 358, 230 359 Z" />
+  </g>
 
-      {/* Microscope (Right) */}
-      <g transform="translate(52, 32)">
-        {/* Eyepiece & Body Tube */}
-        <rect
-          x="18"
-          y="2"
-          width="7"
-          height="18"
-          rx="1.5"
-          transform="rotate(28 18 2)"
-          fill="#0f2d4a"
-        />
-        {/* Curved Arm */}
-        <path
-          d="M18 16 C30 22, 32 40, 18 46"
-          stroke="#136a94"
-          strokeWidth="5"
-          strokeLinecap="round"
-          fill="none"
-        />
-        {/* Focus Knob */}
-        <circle
-          cx="20"
-          cy="24"
-          r="4"
-          fill="#c59b46"
-          stroke="#0f2d4a"
-          strokeWidth="1.5"
-        />
-        {/* Stage & Base */}
-        <rect x="2" y="42" width="22" height="3" rx="1" fill="#0f2d4a" />
-        <path d="M6 54 H32 L26 46 H12 Z" fill="#0f2d4a" />
+  <!-- Clipped Inner Emblem Elements -->
+  <g clip-path="url(#innerCircleClip)">
+    <!-- Teal Medical Cross Backdrop -->
+    <path d="M72 172 H145 V125 H205 V315 H125 V245 H72 Z" fill="#136a94" />
+    <path d="M125 285 C155 320, 215 325, 255 302 L245 325 H125 Z" fill="#0f2d4a" />
+
+    <!-- Golden Tirunamam / Namalu (Top Center) -->
+    <path d="M164 62 L172 142 C174 166, 226 166, 228 142 L236 62 L221 62 L215 136 C214 150, 186 150, 185 136 L179 62 Z" fill="#cfa349" stroke="#ffffff" stroke-width="3" />
+    <!-- Central Flame Drop (Srichurnam) -->
+    <path d="M200 72 C192 98, 190 124, 200 139 C210 124, 208 98, 200 72 Z" fill="#dfa93a" />
+
+    <!-- DNA Double Helix (Tilted Left) with White Halo -->
+    <g transform="rotate(-24 148 215)">
+      <path d="M126 115 C166 145, 110 185, 150 215 C186 245, 126 285, 164 310" stroke="#ffffff" stroke-width="18" stroke-linecap="round" fill="none" />
+      <path d="M164 115 C124 145, 180 185, 140 215 C104 245, 164 285, 126 310" stroke="#ffffff" stroke-width="18" stroke-linecap="round" fill="none" />
+
+      <!-- Base Pair Rungs -->
+      <line x1="134" y1="132" x2="156" y2="132" stroke="#0f2d4a" stroke-width="4.5" />
+      <line x1="132" y1="146" x2="158" y2="146" stroke="#c59b46" stroke-width="4.5" />
+      <line x1="133" y1="182" x2="157" y2="182" stroke="#136a94" stroke-width="4.5" />
+      <line x1="132" y1="196" x2="158" y2="196" stroke="#c59b46" stroke-width="4.5" />
+      <line x1="134" y1="232" x2="156" y2="232" stroke="#0f2d4a" stroke-width="4.5" />
+      <line x1="132" y1="246" x2="158" y2="246" stroke="#c59b46" stroke-width="4.5" />
+      <line x1="135" y1="282" x2="155" y2="282" stroke="#136a94" stroke-width="4.5" />
+
+      <!-- Intertwined Helix Strands -->
+      <path d="M126 115 C166 145, 110 185, 150 215 C186 245, 126 285, 164 310" stroke="#0f2d4a" stroke-width="9" stroke-linecap="round" fill="none" />
+      <path d="M164 115 C124 145, 180 185, 140 215 C104 245, 164 285, 126 310" stroke="#cfa349" stroke-width="9" stroke-linecap="round" fill="none" />
+    </g>
+
+    <!-- Clinical Microscope (Right Side) -->
+    <g>
+      <!-- Curved C-Arm Outer (Teal) & Inner (Gold) -->
+      <path d="M258 164 C308 182, 312 252, 260 274" stroke="#136a94" stroke-width="20" stroke-linecap="round" fill="none" />
+      <path d="M254 176 C288 190, 290 242, 254 260" stroke="#cfa349" stroke-width="7" stroke-linecap="round" fill="none" />
+
+      <!-- Tilted Optical Tube & Eyepiece -->
+      <g transform="rotate(32 252 155)">
+        <rect x="242" y="96" width="20" height="10" rx="3" fill="#0f2d4a" />
+        <rect x="245" y="106" width="14" height="16" fill="#136a94" />
+        <rect x="239" y="122" width="26" height="58" rx="4" fill="#0f2d4a" stroke="#ffffff" stroke-width="2" />
+        <rect x="244" y="128" width="6" height="46" rx="2" fill="#136a94" />
+        <!-- Objective Lenses -->
+        <path d="M236 180 H268 C268 190, 236 190, 236 180 Z" fill="#0f2d4a" />
+        <rect x="241" y="186" width="8" height="16" rx="2" fill="#136a94" />
+        <rect x="253" y="186" width="9" height="22" rx="2" fill="#0f2d4a" />
       </g>
 
-      {/* Laurel Wreath (Bottom Rim) */}
-      <path
-        d="M22 76 C28 94, 44 104, 60 106 C76 104, 92 94, 98 76"
-        stroke="#0f2d4a"
-        strokeWidth="2.5"
-        strokeDasharray="5 3"
-        fill="none"
-      />
-      {/* Bottom Gold Diamond */}
-      <polygon points="60,101 64,108 60,115 56,108" fill="#c59b46" />
-    </svg>
+      <!-- Coaxial Focus Knob -->
+      <circle cx="262" cy="176" r="15" fill="#ffffff" stroke="#0f2d4a" stroke-width="5" />
+      <circle cx="262" cy="176" r="7" fill="#cfa349" />
+
+      <!-- Mechanical Stage & Condenser -->
+      <rect x="196" y="242" width="66" height="9" rx="3" fill="#0f2d4a" />
+      <rect x="210" y="237" width="32" height="4" rx="1.5" fill="#cfa349" />
+      <path d="M220 251 H244 L238 264 H226 Z" fill="#136a94" />
+
+      <!-- Lower Pillar & Heavy Base -->
+      <path d="M238 292 L254 256 L274 282 L284 298 H198 C198 290, 206 286, 218 286 Z" fill="#0f2d4a" />
+      <rect x="194" y="294" width="96" height="12" rx="5" fill="#0f2d4a" />
+      <circle cx="256" cy="272" r="5" fill="#cfa349" />
+    </g>
+  </g>
+
+  <!-- Bottom Lotus / Diamond Finial -->
+  <path d="M200 344 L214 368 L200 392 L186 368 Z" fill="#cfa349" stroke="#ffffff" stroke-width="3" />
+</svg>`;
+
+// =========================================================
+// OFF-SCREEN CANVAS RASTERIZER (300-DPI PNG + WATERMARK)
+// =========================================================
+let preloadedLetterhead = null;
+let rasterizedLogoPng = null;
+let rasterizedWatermarkPng = null;
+
+if (typeof window !== "undefined") {
+  // 1. Check if user uploaded "/letterhead.png" into /public folder
+  const bgImg = new window.Image();
+  bgImg.crossOrigin = "Anonymous";
+  bgImg.src = "/letterhead.png";
+  bgImg.onload = () => {
+    if (bgImg.naturalWidth > 100) {
+      preloadedLetterhead = bgImg;
+    }
+  };
+
+  // 2. Rasterize the detailed SVG into crisp PNG Data URLs for jsPDF
+  const svgImg = new window.Image();
+  const svgBlob = new Blob([DETAILED_LOGO_SVG], {
+    type: "image/svg+xml;charset=utf-8"
+  });
+  const svgUrl = URL.createObjectURL(svgBlob);
+
+  svgImg.onload = () => {
+    try {
+      // Full-opacity high-res logo for top header
+      const canvasLogo = document.createElement("canvas");
+      canvasLogo.width = 480;
+      canvasLogo.height = 480;
+      const ctxLogo = canvasLogo.getContext("2d");
+      ctxLogo.drawImage(svgImg, 0, 0, 480, 480);
+      rasterizedLogoPng = canvasLogo.toDataURL("image/png");
+
+      // Subtle 6% opacity watermark for center of page
+      const canvasWm = document.createElement("canvas");
+      canvasWm.width = 600;
+      canvasWm.height = 600;
+      const ctxWm = canvasWm.getContext("2d");
+      ctxWm.globalAlpha = 0.065;
+      ctxWm.drawImage(svgImg, 0, 0, 600, 600);
+      rasterizedWatermarkPng = canvasWm.toDataURL("image/png");
+    } catch (err) {
+      console.error("Canvas logo rasterization error:", err);
+    }
+    URL.revokeObjectURL(svgUrl);
+  };
+  svgImg.src = svgUrl;
+}
+
+// =========================================================
+// REACT COMPONENT FOR PREVIEW MODAL & PORTAL HEADERS
+// =========================================================
+export function SriBalajiLogoSVG({ size = 80, className = "" }) {
+  return (
+    <div
+      style={{ width: size, height: size }}
+      className={`inline-block shrink-0 ${className}`}
+      dangerouslySetInnerHTML={{
+        __html: DETAILED_LOGO_SVG.replace(
+          'width="600" height="600"',
+          'width="100%" height="100%"'
+        )
+      }}
+    />
   );
 }
 
 // =========================================================
-// VECTOR LETTERHEAD & WATERMARK DRAWER FOR JSPDF
+// MASTER LETTERHEAD DRAWER FOR JSPDF
 // =========================================================
-const drawVectorLogoAndWatermark = (docPdf, cx, cy, radius, isWatermark) => {
-  const navy = isWatermark ? [226, 232, 240] : [15, 45, 74];
-  const teal = isWatermark ? [228, 238, 245] : [19, 106, 148];
-  const gold = isWatermark ? [242, 234, 214] : [197, 155, 70];
-
-  // Outer Navy Ring & Inner Gold Ring
-  docPdf.setDrawColor(...navy);
-  docPdf.setLineWidth(isWatermark ? 1.8 : 1.1);
-  docPdf.circle(cx, cy, radius, "S");
-
-  docPdf.setDrawColor(...gold);
-  docPdf.setLineWidth(isWatermark ? 1.0 : 0.5);
-  docPdf.circle(cx, cy, radius * 0.87, "S");
-
-  // Top Namalu (U-shape + central drop)
-  const namaluTop = cy - radius * 0.72;
-  const namaluBottom = cy - radius * 0.25;
-  const namaluHalfW = radius * 0.18;
-  docPdf.setDrawColor(...gold);
-  docPdf.setLineWidth(isWatermark ? 2.5 : 1.1);
-  docPdf.line(
-    cx - namaluHalfW,
-    namaluTop,
-    cx - namaluHalfW * 0.75,
-    namaluBottom
-  );
-  docPdf.line(
-    cx + namaluHalfW,
-    namaluTop,
-    cx + namaluHalfW * 0.75,
-    namaluBottom
-  );
-  docPdf.line(
-    cx - namaluHalfW * 0.75,
-    namaluBottom,
-    cx + namaluHalfW * 0.75,
-    namaluBottom
-  );
-  docPdf.line(cx, namaluTop + radius * 0.06, cx, namaluBottom - radius * 0.06);
-
-  // Left Medical Cross Block
-  docPdf.setFillColor(...teal);
-  docPdf.rect(
-    cx - radius * 0.55,
-    cy - radius * 0.12,
-    radius * 0.42,
-    radius * 0.28,
-    "F"
-  );
-
-  // Microscope Tube & Base (Right Side)
-  docPdf.setDrawColor(...navy);
-  docPdf.setLineWidth(isWatermark ? 3.0 : 1.3);
-  docPdf.line(
-    cx + radius * 0.35,
-    cy - radius * 0.38,
-    cx + radius * 0.08,
-    cy + radius * 0.08
-  );
-  // Microscope Arm Curve
-  docPdf.setDrawColor(...teal);
-  docPdf.line(
-    cx + radius * 0.25,
-    cy - radius * 0.18,
-    cx + radius * 0.42,
-    cy + radius * 0.12
-  );
-  docPdf.line(
-    cx + radius * 0.42,
-    cy + radius * 0.12,
-    cx + radius * 0.18,
-    cy + radius * 0.32
-  );
-  // Microscope Base Stage
-  docPdf.setDrawColor(...navy);
-  docPdf.line(
-    cx - radius * 0.02,
-    cy + radius * 0.36,
-    cx + radius * 0.48,
-    cy + radius * 0.36
-  );
-
-  // DNA Helix Crossings (Left Side)
-  docPdf.setDrawColor(...gold);
-  docPdf.setLineWidth(isWatermark ? 2.0 : 0.9);
-  docPdf.line(
-    cx - radius * 0.45,
-    cy - radius * 0.35,
-    cx - radius * 0.18,
-    cy + radius * 0.35
-  );
-  docPdf.setDrawColor(...navy);
-  docPdf.line(
-    cx - radius * 0.18,
-    cy - radius * 0.35,
-    cx - radius * 0.45,
-    cy + radius * 0.35
-  );
-};
-
 export const drawSriBalajiLetterhead = (docPdf, useLetterhead = true) => {
   if (!useLetterhead) return;
 
-  // If "/letterhead.png" exists in public folder, stamp the exact image template
+  // Priority 1: If "/letterhead.png" was uploaded to public/, use the exact image
   if (preloadedLetterhead) {
     try {
       docPdf.addImage(preloadedLetterhead, "PNG", 0, 0, 210, 297);
       return;
     } catch (e) {
-      // Fallback to crisp vector letterhead if image fails
+      // Fall through to high-res canvas logo if image fails
     }
   }
 
-  // 1. Center Page Watermark
-  drawVectorLogoAndWatermark(docPdf, 105, 155, 48, true);
+  // Priority 2: High-Resolution Canvas PNG Logo & Watermark
+  if (rasterizedWatermarkPng) {
+    // Centered watermark (88mm x 88mm, subtle 6.5% opacity)
+    docPdf.addImage(rasterizedWatermarkPng, "PNG", 61, 102, 88, 88);
+  }
 
-  // 2. Top Circular Crest Logo
-  drawVectorLogoAndWatermark(docPdf, 62, 22, 13, false);
+  if (rasterizedLogoPng) {
+    // Crisp top-left circular emblem (28mm x 28mm)
+    docPdf.addImage(rasterizedLogoPng, "PNG", 46, 8, 28, 28);
+  }
 
-  // 3. Header Title: SRI BALAJI CLINICAL LABORATORY
+  // Header Typography: SRI BALAJI CLINICAL LABORATORY
   docPdf.setFont("times", "bold");
-  docPdf.setFontSize(26);
-  docPdf.setTextColor(15, 45, 74); // Navy #0f2d4a
-  docPdf.text("SRI BALAJI", 80, 20);
+  docPdf.setFontSize(27);
+  docPdf.setTextColor(15, 45, 74); // Deep Navy #0f2d4a
+  docPdf.text("SRI BALAJI", 78, 21.5);
 
   docPdf.setFont("helvetica", "bold");
-  docPdf.setFontSize(12.5);
-  docPdf.setTextColor(13, 92, 133); // Teal #0d5c85
-  docPdf.text("CLINICAL LABORATORY", 80.5, 27.5);
+  docPdf.setFontSize(12.2);
+  docPdf.setTextColor(19, 106, 148); // Clinical Teal #136a94
+  docPdf.text("CLINICAL LABORATORY", 78.5, 28.5);
 
-  // 4. Ornamental Navy & Gold Divider with Center Diamond
+  // Tapered Ornamental Navy & Gold Divider with Center Diamond
   docPdf.setDrawColor(15, 45, 74);
-  docPdf.setLineWidth(0.6);
-  docPdf.line(14, 38, 102, 38);
-  docPdf.line(108, 38, 196, 38);
+  docPdf.setLineWidth(0.55);
+  docPdf.line(14, 39, 101.5, 39);
+  docPdf.line(108.5, 39, 196, 39);
 
   docPdf.setDrawColor(197, 155, 70);
-  docPdf.setLineWidth(0.4);
-  docPdf.line(25, 38.7, 102, 38.7);
-  docPdf.line(108, 38.7, 185, 38.7);
+  docPdf.setLineWidth(0.35);
+  docPdf.line(28, 39.7, 101.5, 39.7);
+  docPdf.line(108.5, 39.7, 182, 39.7);
 
   // Center Gold Diamond
   docPdf.setFillColor(197, 155, 70);
-  docPdf.triangle(103, 38.3, 105, 36.8, 105, 39.8, "F");
-  docPdf.triangle(107, 38.3, 105, 36.8, 105, 39.8, "F");
+  docPdf.triangle(102.5, 39.3, 105, 37.6, 105, 41.0, "F");
+  docPdf.triangle(107.5, 39.3, 105, 37.6, 105, 41.0, "F");
 
-  // 5. Contact Info Line
+  // Contact Line
   docPdf.setFont("helvetica", "normal");
   docPdf.setFontSize(8.8);
   docPdf.setTextColor(15, 45, 74);
   docPdf.text(
     "Sathiraju Complex, Main Road, Kothapeta  •  Ph: +91 9849923729  •  Email: prasad balajilab@gmail.com",
     105,
-    43.5,
+    44.5,
     { align: "center" }
   );
 
-  // 6. Bottom Footer: TRUST • ACCURACY • CARE
+  // Bottom Footer: TRUST • ACCURACY • CARE
   docPdf.setDrawColor(15, 45, 74);
-  docPdf.setLineWidth(1.2);
-  docPdf.line(0, 286.5, 50, 286.5);
-  docPdf.line(160, 286.5, 210, 286.5);
+  docPdf.setLineWidth(1.1);
+  docPdf.line(0, 286.5, 52, 286.5);
+  docPdf.line(158, 286.5, 210, 286.5);
 
   docPdf.setFont("helvetica", "bold");
   docPdf.setFontSize(10.5);
   docPdf.setTextColor(15, 45, 74);
   docPdf.text("TRUST  •  ACCURACY  •  CARE", 105, 287.8, { align: "center" });
 
-  // Bottom Gold & Navy Full-Bleed Bars
   docPdf.setFillColor(197, 155, 70);
   docPdf.rect(0, 291.5, 210, 1.5, "F");
   docPdf.setFillColor(15, 45, 74);
@@ -484,12 +442,10 @@ export const expandToIndividualTests = (
 export const generatePDF = (patient, tests, results, useLetterhead = true) => {
   const docPdf = new jsPDF();
 
-  // Draw Letterhead on Page 1
   drawSriBalajiLetterhead(docPdf, useLetterhead);
 
-  const startY = useLetterhead ? 52 : 20;
+  const startY = useLetterhead ? 53 : 20;
 
-  // Patient Demographics Box
   docPdf.setDrawColor(203, 213, 225);
   docPdf.setLineWidth(0.3);
   docPdf.roundedRect(14, startY - 5, 182, 21, 2, 2, "S");
@@ -514,7 +470,6 @@ export const generatePDF = (patient, tests, results, useLetterhead = true) => {
     startY + 12
   );
 
-  // Build rows with Profile Section Headers
   const tableRows = [];
   let lastGroup = null;
 
@@ -548,7 +503,7 @@ export const generatePDF = (patient, tests, results, useLetterhead = true) => {
 
   docPdf.autoTable({
     startY: startY + 20,
-    margin: { top: 50, bottom: 26, left: 14, right: 14 },
+    margin: { top: 52, bottom: 26, left: 14, right: 14 },
     head: [
       ["Test Description", "Result Value", "Flag", "Reference Range", "Unit"]
     ],
@@ -556,7 +511,7 @@ export const generatePDF = (patient, tests, results, useLetterhead = true) => {
     theme: "grid",
     headStyles: { fillColor: [15, 45, 74], textColor: [255, 255, 255] },
     styles: {
-      fillColor: false, // Transparent cells so center watermark shows through
+      fillColor: false,
       textColor: [15, 23, 42],
       lineColor: [203, 213, 225],
       lineWidth: 0.2
@@ -615,27 +570,32 @@ export const generateBillPDF = (booking) => {
   docPdf.setFont("helvetica", "bold");
   docPdf.setFontSize(12);
   docPdf.setTextColor(15, 45, 74);
-  docPdf.text("PATIENT BILL / PAYMENT RECEIPT", 105, 51, { align: "center" });
+  docPdf.text("PATIENT BILL / PAYMENT RECEIPT", 105, 52, { align: "center" });
+
+  // Patient Demographics Box
+  docPdf.setDrawColor(203, 213, 225);
+  docPdf.setLineWidth(0.3);
+  docPdf.roundedRect(14, 56, 182, 20, 2, 2, "S");
 
   docPdf.setFontSize(9.5);
-  docPdf.text(`Patient Name: ${booking.name || "N/A"}`, 14, 59);
+  docPdf.text(`Patient Name : ${booking.name || "N/A"}`, 18, 61.5);
   docPdf.text(
-    `Age / Gender: ${booking.age || "N/A"} Yrs / ${booking.gender || "N/A"}`,
-    14,
-    65
+    `Age / Gender : ${booking.age || "N/A"} Yrs / ${booking.gender || "N/A"}`,
+    18,
+    67.5
   );
-  docPdf.text(`Phone: ${booking.phone || "N/A"}`, 14, 71);
+  docPdf.text(`Phone        : ${booking.phone || "N/A"}`, 18, 73.5);
 
   docPdf.text(
-    `Receipt / Clinical ID: ${booking.clinicalId || booking.bookingRef || "N/A"}`,
-    125,
-    59
+    `Receipt / ID : ${booking.clinicalId || booking.bookingRef || "N/A"}`,
+    120,
+    61.5
   );
-  docPdf.text(`Date: ${booking.date || "N/A"}`, 125, 65);
+  docPdf.text(`Date         : ${booking.date || "N/A"}`, 120, 67.5);
   docPdf.text(
-    `Collection: ${booking.collectionType === "home" ? "Home Visit" : "Lab Visit"}`,
-    125,
-    71
+    `Collection   : ${booking.collectionType === "home" ? "Home Visit" : "Lab Visit"}`,
+    120,
+    73.5
   );
 
   const items =
@@ -650,35 +610,64 @@ export const generateBillPDF = (booking) => {
   ]);
 
   docPdf.autoTable({
-    startY: 77,
+    startY: 80,
     head: [["#", "Test / Health Package Description", "Amount"]],
     body: bodyData,
     theme: "grid",
     headStyles: { fillColor: [15, 45, 74] },
-    styles: { fillColor: false }
+    styles: { fillColor: false, textColor: [15, 23, 42] }
   });
 
-  const y = docPdf.lastAutoTable.finalY + 10;
-  const totalPaid =
-    Number(booking.cashPaid || 0) + Number(booking.upiPaid || 0);
+  // Accurate Financial Summary Calculation (Fixes Balance Due: 0 bug)
+  const grandTotal = Number(booking.total || booking.subtotal || 0);
+  const cashPaid = Number(booking.cashPaid || 0);
+  const upiPaid = Number(booking.upiPaid || 0);
+  const totalPaid = cashPaid + upiPaid;
+  const computedBalance =
+    booking.balanceDue !== undefined && booking.balanceDue !== null
+      ? Number(booking.balanceDue)
+      : Math.max(0, grandTotal - totalPaid);
 
-  docPdf.setFontSize(10);
-  docPdf.text(`Subtotal: Rs. ${booking.subtotal || booking.total || 0}`, 135, y);
+  const summaryRows = [
+    ["Subtotal", `Rs. ${booking.subtotal || grandTotal}`]
+  ];
   if (Number(booking.discount || 0) > 0) {
-    docPdf.text(`Discount: - Rs. ${booking.discount}`, 135, y + 6);
+    summaryRows.push(["Promo Discount", `- Rs. ${booking.discount}`]);
   }
   if (Number(booking.deliveryFee || 0) > 0) {
-    docPdf.text(`Home Visit Fee: + Rs. ${booking.deliveryFee}`, 135, y + 12);
+    summaryRows.push(["Home Visit Fee", `+ Rs. ${booking.deliveryFee}`]);
   }
-  docPdf.setFontSize(12);
-  docPdf.text(`Grand Total: Rs. ${booking.total || 0}`, 135, y + 20);
-  docPdf.setFontSize(10);
-  docPdf.text(
-    `Amount Paid: Rs. ${totalPaid} (Cash: ${booking.cashPaid || 0}, UPI: ${booking.upiPaid || 0})`,
-    110,
-    y + 28
-  );
-  docPdf.text(`Balance Due: Rs. ${booking.balanceDue || 0}`, 135, y + 35);
+  summaryRows.push(["Grand Total", `Rs. ${grandTotal}`]);
+  summaryRows.push([
+    "Amount Paid",
+    `Rs. ${totalPaid} (Cash: ${cashPaid}, UPI: ${upiPaid})`
+  ]);
+  summaryRows.push(["Balance Due", `Rs. ${computedBalance}`]);
+
+  docPdf.autoTable({
+    startY: docPdf.lastAutoTable.finalY + 6,
+    margin: { left: 110, right: 14 },
+    body: summaryRows,
+    theme: "plain",
+    styles: {
+      fontSize: 9.5,
+      cellPadding: 1.8,
+      textColor: [15, 45, 74]
+    },
+    columnStyles: {
+      0: { fontStyle: "bold", halign: "right" },
+      1: { fontStyle: "bold", halign: "right" }
+    },
+    didParseCell: function (data) {
+      const label = summaryRows[data.row.index][0];
+      if (label === "Grand Total") {
+        data.cell.styles.fontSize = 11.5;
+      }
+      if (label === "Balance Due" && computedBalance > 0) {
+        data.cell.styles.textColor = [220, 38, 38];
+      }
+    }
+  });
 
   docPdf.save(`Bill_${booking.clinicalId || "Receipt"}_${booking.name}.pdf`);
 };
