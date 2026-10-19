@@ -76,27 +76,38 @@ function Booking() {
 
   return (
     <div className="min-h-screen bg-[#f4f6fb] font-sans py-6 px-4 md:px-8">
-      {/* Clinic Hero Header with /logo.png support */}
+      {/* Clinic Hero Header: Circular Logo + Full Clinic Title & Address */}
       <div className="max-w-7xl mx-auto bg-white rounded-2xl shadow-sm border-t-4 border-[#0f2d4a] p-6 md:p-8 mb-8 text-center">
-        {!logoError ? (
-          <img
-            src="/logo.png"
-            alt="Sri Balaji Clinical Laboratory"
-            onError={() => setLogoError(true)}
-            className="h-24 md:h-28 w-auto mx-auto mb-3 object-contain"
-          />
-        ) : (
-          <>
-            <h1 className="text-3xl md:text-4xl font-extrabold text-[#153e90] tracking-tight mb-2">
-              Sri Balaji Clinical Laboratory
+        <div className="flex flex-col md:flex-row items-center justify-center gap-4 md:gap-6 mb-4">
+          {!logoError && (
+            <img
+              src="/logo.png"
+              alt="Sri Balaji Clinical Laboratory Emblem"
+              onError={() => setLogoError(true)}
+              className="w-24 h-24 md:w-28 md:h-28 object-contain shrink-0"
+            />
+          )}
+          <div className="text-center md:text-left">
+            <h1 className="text-3xl md:text-5xl font-serif font-extrabold text-[#0f2d4a] tracking-wide leading-tight">
+              SRI BALAJI
             </h1>
-            <p className="text-slate-600 font-medium text-base md:text-lg mb-5">
-              Professional Lab Tests &amp; Home Collection
+            <p className="text-sm md:text-lg font-extrabold text-[#0d5c85] tracking-[0.18em] uppercase mt-0.5">
+              CLINICAL LABORATORY
             </p>
-          </>
-        )}
+            <p className="text-slate-600 font-medium text-xs md:text-sm mt-1.5">
+              Professional Lab Tests &amp; Home Sample Collection
+            </p>
+          </div>
+        </div>
 
-        <div className="inline-flex flex-col md:flex-row items-center justify-center gap-3 md:gap-6 bg-slate-50 border border-slate-200 px-6 py-2.5 rounded-full text-sm text-slate-700">
+        {/* Ornamental Gold & Navy Divider */}
+        <div className="max-w-2xl mx-auto flex items-center justify-center my-3">
+          <div className="h-[1.5px] flex-1 bg-gradient-to-r from-transparent via-[#0f2d4a] to-[#c59b46]"></div>
+          <span className="text-[#c59b46] mx-2 text-xs leading-none">◆</span>
+          <div className="h-[1.5px] flex-1 bg-gradient-to-l from-transparent via-[#0f2d4a] to-[#c59b46]"></div>
+        </div>
+
+        <div className="inline-flex flex-col md:flex-row items-center justify-center gap-3 md:gap-6 bg-slate-50 border border-slate-200 px-6 py-2.5 rounded-full text-sm text-slate-700 mt-1">
           <span className="flex items-center gap-1.5">
             <span className="text-rose-500">📍</span>
             Sathiraju complex, near Ganapathi Bhojanam hotel, Main road,
@@ -105,7 +116,7 @@ function Booking() {
           <span className="hidden md:inline text-slate-300">|</span>
           <a
             href="tel:+919849923729"
-            className="flex items-center gap-1.5 font-extrabold text-[#153e90] hover:underline"
+            className="flex items-center gap-1.5 font-extrabold text-[#0f2d4a] hover:underline"
           >
             <span className="text-rose-500">📞</span> +91 9849923729
           </a>
