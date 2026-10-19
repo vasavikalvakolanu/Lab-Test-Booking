@@ -25,7 +25,7 @@ if (typeof window !== "undefined") {
 }
 
 // React component to display your exact logo anywhere in portals
-export function SriBalajiLogoImg({ width = 180, className = "" }) {
+export function SriBalajiLogoSVG({ width = 180, className = "" }) {
   return (
     <img
       src="/logo.png"
@@ -42,17 +42,13 @@ export function SriBalajiLogoImg({ width = 180, className = "" }) {
 export const drawSriBalajiLetterhead = (docPdf, useLetterhead = true) => {
   if (!useLetterhead) return;
 
-  // If letterhead.png exists in /public, stamp the exact high-res template
   if (preloadedLetterhead) {
     try {
       docPdf.addImage(preloadedLetterhead, "PNG", 0, 0, 210, 297);
       return;
-    } catch (e) {
-      // Fall through if any canvas taint occurs
-    }
+    } catch (e) {}
   }
 
-  // Fallback layout if image hasn't loaded yet
   if (preloadedLogo) {
     try {
       docPdf.addImage(preloadedLogo, "PNG", 14, 8, 55, 22);
