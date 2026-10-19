@@ -3,6 +3,7 @@ import { db, auth } from "./firebase";
 import { signInWithEmailAndPassword, signOut, onAuthStateChanged } from "firebase/auth";
 import { collection, getDocs, doc, getDoc } from "firebase/firestore";
 
+import { SriBalajiLogoSVG } from "./Staff/staffUtils";
 import { AdminDashboard } from "./Admin/AdminDashboard";
 import { RecordsTab } from "./Admin/AdminBookings";
 import { CatalogTab, PackagesTab } from "./Admin/AdminCatalog";
@@ -45,7 +46,9 @@ function Admin() {
   const handleLogin = async (e) => {
     e.preventDefault();
     if (!ADMIN_EMAILS.includes(email.toLowerCase())) {
-      alert("Access Denied. Admin privileges required. Please use the Staff Portal.");
+      alert(
+        "Access Denied. Admin privileges required. Please use the Staff Portal."
+      );
       return;
     }
     try {
@@ -115,21 +118,31 @@ function Admin() {
 
   if (!user) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-100 font-sans">
+      <div className="min-h-screen flex items-center justify-center bg-slate-100 font-sans p-4">
         <form
           onSubmit={handleLogin}
-          className="bg-white p-8 rounded border shadow-sm w-96"
+          className="bg-white p-8 rounded-xl border border-slate-200 shadow-md w-full max-w-sm text-center"
         >
-          <h2 className="text-xl font-bold text-slate-800 mb-6 text-center">
-            Admin Portal Login
-          </h2>
-          <div className="space-y-4">
+          <div className="flex justify-center mb-3">
+            <SriBalajiLogoSVG size={76} />
+          </div>
+          <h1 className="text-xl font-serif font-extrabold text-[#0f2d4a] tracking-wide">
+            SRI BALAJI
+          </h1>
+          <p className="text-[11px] font-extrabold text-[#0d5c85] tracking-[0.16em] uppercase mb-1">
+            CLINICAL LABORATORY
+          </p>
+          <p className="text-xs font-semibold text-slate-700 bg-slate-100 border border-slate-200 inline-block px-3 py-0.5 rounded-full mb-6">
+            Enterprise Admin Portal
+          </p>
+
+          <div className="space-y-4 text-left">
             <input
               type="email"
               placeholder="Admin Email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full p-2 border rounded outline-none focus:border-blue-500"
+              className="w-full p-2.5 border rounded-lg outline-none focus:border-blue-500 text-sm"
               required
             />
             <input
@@ -137,12 +150,12 @@ function Admin() {
               placeholder="Password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full p-2 border rounded outline-none focus:border-blue-500"
+              className="w-full p-2.5 border rounded-lg outline-none focus:border-blue-500 text-sm"
               required
             />
             <button
               type="submit"
-              className="w-full bg-slate-800 hover:bg-slate-900 transition text-white font-bold py-2 rounded mt-2"
+              className="w-full bg-[#0f2d4a] hover:bg-slate-900 transition text-white font-bold py-2.5 rounded-lg mt-2 shadow-sm"
             >
               Secure Login
             </button>
@@ -154,7 +167,7 @@ function Admin() {
 
   if (!ADMIN_EMAILS.includes(user.email.toLowerCase())) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 text-center">
+      <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 text-center p-4">
         <h2 className="text-2xl font-bold text-red-600 mb-4">
           Access Restricted
         </h2>
@@ -174,27 +187,36 @@ function Admin() {
   return (
     <div className="min-h-screen bg-slate-50 font-sans text-slate-800 pb-10">
       <div className="bg-white border-b sticky top-0 z-10 shadow-sm">
-        <div className="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
-          <div>
-            <h1 className="text-xl font-bold">Sri Balaji Diagnostics</h1>
-            <p className="text-xs text-slate-500 font-medium">
-              Enterprise Admin Portal
-            </p>
+        <div className="max-w-7xl mx-auto px-6 py-3 flex justify-between items-center">
+          <div className="flex items-center gap-3.5">
+            <SriBalajiLogoSVG size={52} />
+            <div>
+              <h1 className="text-xl font-serif font-extrabold text-[#0f2d4a] tracking-wide leading-none">
+                SRI BALAJI
+              </h1>
+              <p className="text-[11px] font-extrabold text-[#0d5c85] tracking-[0.15em] uppercase mt-0.5">
+                CLINICAL LABORATORY
+              </p>
+              <p className="text-[11px] text-slate-500 font-medium">
+                Enterprise Admin Portal
+              </p>
+            </div>
           </div>
+
           <div className="flex gap-4 items-center">
-            <span className="text-xs font-bold text-slate-500 bg-slate-100 px-2 py-1 rounded">
+            <span className="text-xs font-bold text-slate-600 bg-slate-100 px-2.5 py-1 rounded border">
               {user.email}
             </span>
             <button
               onClick={() => signOut(auth)}
-              className="text-sm font-medium border border-slate-200 px-4 py-1.5 rounded hover:bg-slate-50"
+              className="text-sm font-medium border border-slate-200 px-4 py-1.5 rounded hover:bg-slate-50 transition"
             >
               Logout
             </button>
           </div>
         </div>
 
-        {/* Navigation Tabs (Web Bookings removed) */}
+        {/* Navigation Tabs */}
         <div className="max-w-7xl mx-auto px-6 flex space-x-1 overflow-x-auto">
           {[
             { id: "dashboard", label: "📊 Daily Dashboard" },
@@ -211,7 +233,7 @@ function Admin() {
               onClick={() => setActiveTab(tab.id)}
               className={`px-4 py-3 text-sm font-bold border-b-2 whitespace-nowrap transition-colors ${
                 activeTab === tab.id
-                  ? "border-slate-800 text-slate-900"
+                  ? "border-[#0f2d4a] text-[#0f2d4a]"
                   : "border-transparent text-slate-500 hover:bg-slate-50"
               }`}
             >
@@ -242,6 +264,7 @@ function Admin() {
 
         {activeTab === "dashboard" && (
           <AdminDashboard
+            bookings={bookings}
             liveBookings={liveBookings}
             userEmail={user.email}
             fetchData={fetchData}
