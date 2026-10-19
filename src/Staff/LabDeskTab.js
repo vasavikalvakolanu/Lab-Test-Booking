@@ -706,7 +706,7 @@ export function LabDeskTab({
         </button>
       </div>
 
-      {/* READ-ONLY HTML PREVIEW MODAL MATCHING /letterhead.png */}
+      {/* READ-ONLY HTML PREVIEW MODAL (FIXED HEADER CLEARANCE & TRANSPARENT WATERMARK) */}
       {showPreviewModal && (
         <div
           onContextMenu={(e) => e.preventDefault()}
@@ -731,28 +731,37 @@ export function LabDeskTab({
               </button>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-6 md:p-10">
-              <div className="bg-white max-w-3xl mx-auto shadow-lg border border-slate-300 min-h-[1050px] flex flex-col justify-between relative overflow-hidden">
-                {/* Use /letterhead.png as full A4 background if available */}
+            <div className="flex-1 overflow-y-auto p-4 md:p-8">
+              <div className="bg-white max-w-[760px] mx-auto shadow-lg border border-slate-300 min-h-[1075px] flex flex-col justify-between relative overflow-hidden">
+                {/* Pinned aspect-ratio letterhead image so header never stretches */}
                 {!letterheadBgFailed && (
                   <img
                     src="/letterhead.png"
                     alt=""
                     onError={() => setLetterheadBgFailed(true)}
-                    className="absolute inset-0 w-full h-full object-fill pointer-events-none z-0"
+                    className="absolute top-0 left-0 w-full h-auto pointer-events-none z-0"
                   />
                 )}
 
                 <div
-                  className={`px-8 md:px-10 relative z-10 ${
-                    !letterheadBgFailed ? "pt-52 pb-24" : "pt-8 pb-16"
-                  }`}
+                  style={{
+                    paddingTop: !letterheadBgFailed ? "28.5%" : "2rem"
+                  }}
+                  className="px-8 md:px-12 pb-20 relative z-10"
                 >
-                  {/* Fallback Header ONLY if /letterhead.png is not uploaded */}
+                  {/* Fallback Header ONLY if /letterhead.png is missing */}
                   {letterheadBgFailed && (
                     <div className="mb-6">
-                      <div className="flex justify-center mb-3">
-                        <SriBalajiLogoSVG size={95} />
+                      <div className="flex items-center justify-center gap-4 mb-3">
+                        <SriBalajiLogoSVG size={78} />
+                        <div className="text-left">
+                          <h1 className="text-3xl font-serif font-extrabold text-[#0f2d4a] tracking-wide leading-none">
+                            SRI BALAJI
+                          </h1>
+                          <p className="text-sm font-extrabold text-[#0d5c85] tracking-[0.18em] mt-1">
+                            CLINICAL LABORATORY
+                          </p>
+                        </div>
                       </div>
                       <div className="h-[2px] w-full bg-gradient-to-r from-transparent via-[#0f2d4a] to-transparent my-2"></div>
                       <p className="text-center text-[11px] font-semibold text-[#0f2d4a]">
@@ -762,25 +771,25 @@ export function LabDeskTab({
                     </div>
                   )}
 
-                  {/* Patient Demographics Box */}
-                  <div className="grid grid-cols-2 gap-4 text-xs text-slate-800 mb-6 bg-white/90 p-4 rounded border border-slate-300">
+                  {/* Patient Demographics Box (Sits cleanly below contact line) */}
+                  <div className="grid grid-cols-2 gap-4 text-xs text-slate-800 mb-5 bg-white/80 p-3.5 rounded-md border border-slate-300">
                     <div className="space-y-1.5">
                       <p>
                         <span className="font-bold text-[#0f2d4a]">
-                          Patient Name:
+                          Patient Name :
                         </span>{" "}
                         {processingBooking.name}
                       </p>
                       <p>
                         <span className="font-bold text-[#0f2d4a]">
-                          Age / Gender:
+                          Age / Gender :
                         </span>{" "}
                         {processingBooking.age || "N/A"} Yrs /{" "}
                         {processingBooking.gender || "N/A"}
                       </p>
                       <p>
                         <span className="font-bold text-[#0f2d4a]">
-                          Contact:
+                          Contact No :
                         </span>{" "}
                         {processingBooking.phone || "Walk-in"}
                       </p>
@@ -788,25 +797,27 @@ export function LabDeskTab({
                     <div className="space-y-1.5">
                       <p>
                         <span className="font-bold text-[#0f2d4a]">
-                          Clinical ID:
+                          Clinical ID :
                         </span>{" "}
                         {processingBooking.clinicalId || "N/A"}
                       </p>
                       <p>
-                        <span className="font-bold text-[#0f2d4a]">Date:</span>{" "}
+                        <span className="font-bold text-[#0f2d4a]">
+                          Report Date :
+                        </span>{" "}
                         {processingBooking.date}
                       </p>
                       <p>
                         <span className="font-bold text-[#0f2d4a]">
-                          Ref Doctor:
+                          Ref. By Dr. :
                         </span>{" "}
                         {getDoctorName(processingBooking)}
                       </p>
                     </div>
                   </div>
 
-                  {/* Results Table */}
-                  <table className="w-full text-left text-xs border border-slate-300">
+                  {/* Results Table with Transparent Rows for Watermark Visibility */}
+                  <table className="w-full text-left text-xs border border-slate-300 bg-transparent">
                     <thead className="bg-[#0f2d4a] text-white">
                       <tr>
                         <th className="p-2.5 border border-slate-700">
@@ -822,7 +833,7 @@ export function LabDeskTab({
                         <th className="p-2.5 border border-slate-700">Unit</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-200">
+                    <tbody className="divide-y divide-slate-200 bg-transparent">
                       {(processingBooking.tests || []).map((t, idx) => {
                         const key = getTestKey(t, idx);
                         const res = (results &&
@@ -836,7 +847,7 @@ export function LabDeskTab({
                           res.flag === "Critical";
 
                         return (
-                          <tr key={key}>
+                          <tr key={key} className="bg-transparent">
                             <td className="p-2.5 border border-slate-200 font-medium text-slate-800">
                               {t.name}
                               {t.parentPackage ? (
@@ -877,7 +888,7 @@ export function LabDeskTab({
                 </div>
 
                 {/* Signature Block */}
-                <div className="relative z-10 pb-14 px-10 flex justify-end">
+                <div className="relative z-10 pb-16 px-12 flex justify-end">
                   <div className="text-center">
                     <div className="w-48 border-b border-[#0f2d4a] mb-1"></div>
                     <p className="text-xs font-bold text-[#0f2d4a]">
