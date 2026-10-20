@@ -1,7 +1,11 @@
 import React, { useState } from "react";
 import { updateDoc, doc, arrayUnion } from "firebase/firestore";
 import { db } from "../firebase";
-import { generatePDF, generateBillPDF } from "./staffUtils";
+import {
+  printPDFDirectly,
+  generatePDF,
+  printBillPDFDirectly
+} from "./staffUtils";
 
 export function CollectionsTab({
   pendingBookings,
@@ -68,12 +72,14 @@ export function CollectionsTab({
                 </td>
                 <td className="p-4 text-right space-x-2">
                   <button
-                    onClick={() => generateBillPDF(b)}
+                    type="button"
+                    onClick={() => printBillPDFDirectly(b)}
                     className="bg-white border border-slate-300 text-slate-700 px-3 py-2 rounded font-bold text-xs hover:bg-slate-50"
                   >
-                    🧾 Bill PDF
+                    🖨️ Print Bill
                   </button>
                   <button
+                    type="button"
                     onClick={() => markSampleCollected(b)}
                     className="bg-amber-500 hover:bg-amber-600 text-white px-4 py-2 rounded font-bold transition shadow-sm"
                   >
@@ -94,11 +100,20 @@ export function PastRecordsTab({
   getDoctorName,
   expandTests,
   userEmail,
+  staffPermissions,
   fetchData,
   onUnlockRecord
 }) {
   const [recordSearch, setRecordSearch] = useState("");
   const [recordDate, setRecordDate] = useState("");
+  const [useLetterhead, setUseLetterhead] = useState(true);
+
+  const perms = staffPermissions || {
+    canPrint: true,
+    canWhatsapp: true,
+    canDownload: false,
+    canUnlock: false
+  };
 
   const filteredRecords = (pastRecords || []).filter((b) => {
     const q = recordSearch.toLowerCase();
@@ -111,12 +126,92 @@ export function PastRecordsTab({
     return matchText && matchDate;
   });
 
-  const downloadFinalPDF = async (b) => {
+  // DIRECT PRINTOUT HANDLER (NO FILE DOWNLOAD)
+  const handlePrintReport = async (b) => {
+    if (!perms.canPrint) {
+      return alert(
+        "Access Restricted: Your account does not have permission to print reports. Please contact the Administrator."
+      );
+    }
+
     if (Number(b.balanceDue || 0) > 0) {
       const proceed = window.confirm(
-        `⚠️ UNPAID BALANCE ALERT: This patient still has a pending balance of ₹${b.balanceDue}.\n\nDo you still want to download the final report?`
+        `⚠️ UNPAID BALANCE ALERT: This patient still has a pending balance of ₹${b.balanceDue}.\n\nDo you still want to print the final report?`
       );
       if (!proceed) return;
+    }
+
+    const docName = getDoctorName(b);
+    const currentTests = expandTests(b.tests || b.cartItems || []);
+    const currentResults = b.results || {};
+
+    printPDFDirectly(
+      { ...b, doctorName: docName },
+      currentTests,
+      currentResults,
+      useLetterhead
+    );
+
+    const logEntry = {
+      by: `${userEmail} (Printed)`,
+      time: new Date().toISOString()
+    };
+
+    await updateDoc(doc(db, "bookings", b.id), {
+      reportGenerated: true,
+      reportGeneratedBy: b.reportGeneratedBy || userEmail,
+      reportGeneratedAt: b.reportGeneratedAt || new Date().toISOString(),
+      downloadLogs: arrayUnion(logEntry),
+      history: arrayUnion({
+        action: "Report Printed Directly from Portal",
+        by: userEmail,
+        time: new Date().toISOString()
+      })
+    });
+
+    fetchData();
+  };
+
+  // WHATSAPP FORWARD HANDLER (PERMISSION GUARDED + AUDIT LOGGED)
+  const handleWhatsappForward = async (b) => {
+    if (!perms.canWhatsapp) {
+      return alert(
+        "Access Restricted: Your account is not authorized to forward reports via WhatsApp."
+      );
+    }
+
+    if (!b.phone) {
+      return alert("No phone number recorded for this patient.");
+    }
+
+    const cleanPhone = b.phone.replace(/\D/g, "");
+    const testsSummary = (b.cartItems || b.tests || [])
+      .map((t) => t.name)
+      .join(", ");
+    const msg = `Hello *${b.name}*,\nYour clinical lab report at *Sri Balaji Clinical Laboratory* is ready.\n\n*Clinical ID:* ${b.clinicalId}\n*Date:* ${b.date}\n*Tests:* ${testsSummary}\n*Balance Due:* ₹${b.balanceDue || 0}\n\nThank you for choosing Sri Balaji Clinical Laboratory, Kothapeta.`;
+
+    window.open(
+      `https://wa.me/91${cleanPhone}?text=${encodeURIComponent(msg)}`,
+      "_blank"
+    );
+
+    await updateDoc(doc(db, "bookings", b.id), {
+      history: arrayUnion({
+        action: `Forwarded Report Notification via WhatsApp to ${cleanPhone}`,
+        by: userEmail,
+        time: new Date().toISOString()
+      })
+    });
+
+    fetchData();
+  };
+
+  // OPTIONAL DOWNLOAD HANDLER (ONLY IF ADMIN EXPLICITLY ALLOWS DOWNLOAD)
+  const handleDownloadPDF = async (b) => {
+    if (!perms.canDownload) {
+      return alert(
+        "Access Restricted: Direct downloading is disabled for your account. Please use 'Print Report'."
+      );
     }
 
     const docName = getDoctorName(b);
@@ -127,11 +222,11 @@ export function PastRecordsTab({
       { ...b, doctorName: docName },
       currentTests,
       currentResults,
-      true
+      useLetterhead
     );
 
     const downloadLog = {
-      by: userEmail,
+      by: `${userEmail} (Downloaded)`,
       time: new Date().toISOString()
     };
 
@@ -141,7 +236,7 @@ export function PastRecordsTab({
       reportGeneratedAt: b.reportGeneratedAt || new Date().toISOString(),
       downloadLogs: arrayUnion(downloadLog),
       history: arrayUnion({
-        action: "PDF Downloaded",
+        action: "PDF File Downloaded to Computer",
         by: userEmail,
         time: new Date().toISOString()
       })
@@ -151,6 +246,12 @@ export function PastRecordsTab({
   };
 
   const handleUnlock = async (b) => {
+    if (!perms.canUnlock) {
+      return alert(
+        "Access Restricted: Only authorized accounts can unlock and modify finalized reports."
+      );
+    }
+
     const msg =
       "Unlock this record? This will move it back to the Lab Desk so you can modify patient details, tests, billing, and results.";
     if (!window.confirm(msg)) return;
@@ -178,8 +279,8 @@ export function PastRecordsTab({
 
   return (
     <div>
-      {/* Search & Date Filter Bar */}
-      <div className="flex flex-wrap gap-3 mb-4 bg-slate-50 p-3 rounded-lg border">
+      {/* Search, Date Filter & Letterhead Print Mode Bar */}
+      <div className="flex flex-wrap items-center gap-3 mb-4 bg-slate-50 p-3 rounded-lg border">
         <input
           type="text"
           placeholder="Search by Patient Name, Phone, or Clinical ID (SBD-...)..."
@@ -193,8 +294,17 @@ export function PastRecordsTab({
           onChange={(e) => setRecordDate(e.target.value)}
           className="p-2 border rounded text-sm outline-none focus:border-emerald-500 bg-white"
         />
+        <label className="flex items-center gap-2 text-xs font-bold text-slate-700 bg-white px-3 py-2 rounded border cursor-pointer">
+          <input
+            type="checkbox"
+            checked={useLetterhead}
+            onChange={(e) => setUseLetterhead(e.target.checked)}
+          />
+          Include Digital Letterhead
+        </label>
         {(recordSearch || recordDate) && (
           <button
+            type="button"
             onClick={() => {
               setRecordSearch("");
               setRecordDate("");
@@ -213,8 +323,8 @@ export function PastRecordsTab({
               <th className="p-4 font-bold text-slate-600">ID / Date</th>
               <th className="p-4 font-bold text-slate-600">Patient</th>
               <th className="p-4 font-bold text-slate-600">Billing</th>
-              <th className="p-4 font-bold text-slate-600">Report Status</th>
-              <th className="p-4 text-right">Actions</th>
+              <th className="p-4 font-bold text-slate-600">Print Status</th>
+              <th className="p-4 text-right">Authorized Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
@@ -266,11 +376,11 @@ export function PastRecordsTab({
                     <td className="p-4">
                       {b.reportGenerated ? (
                         <span className="text-xs bg-emerald-100 text-emerald-800 px-2 py-1 rounded font-bold border border-emerald-200">
-                          ✅ Generated by {b.reportGeneratedBy}
+                          ✅ Printed by {b.reportGeneratedBy}
                         </span>
                       ) : (
                         <span className="text-xs bg-amber-100 text-amber-800 px-2 py-1 rounded font-bold border border-amber-200">
-                          ⏳ Pending Generation
+                          ⏳ Ready to Print
                         </span>
                       )}
 
@@ -280,7 +390,7 @@ export function PastRecordsTab({
                             className="font-bold underline cursor-help"
                             title={downloadTooltip}
                           >
-                            Downloaded {logList.length} time(s)
+                            Printed/Issued {logList.length} time(s)
                           </span>
                         </div>
                       )}
@@ -288,35 +398,52 @@ export function PastRecordsTab({
                     <td className="p-4 text-right">
                       <div className="flex flex-wrap justify-end gap-1.5">
                         <button
-                          onClick={() => generateBillPDF(b)}
+                          type="button"
+                          onClick={() => printBillPDFDirectly(b)}
                           className="bg-white border text-slate-700 hover:bg-slate-100 px-2.5 py-1.5 rounded text-xs font-bold transition"
                         >
-                          🧾 Bill
+                          🧾 Print Bill
                         </button>
-                        {b.phone && (
-                          <a
-                            href={`https://wa.me/91${b.phone.replace(/\D/g, "")}?text=${encodeURIComponent(
-                              `Hello ${b.name}, your lab report (ID:${b.clinicalId}) at Sri Balaji Diagnostics is ready.`
-                            )}`}
-                            target="_blank"
-                            rel="noreferrer"
+
+                        {perms.canWhatsapp && b.phone && (
+                          <button
+                            type="button"
+                            onClick={() => handleWhatsappForward(b)}
                             className="bg-emerald-50 border border-emerald-200 text-emerald-700 hover:bg-emerald-100 px-2.5 py-1.5 rounded text-xs font-bold transition"
                           >
-                            WhatsApp
-                          </a>
+                            📲 WhatsApp
+                          </button>
                         )}
-                        <button
-                          onClick={() => handleUnlock(b)}
-                          className="bg-white border text-slate-600 hover:bg-slate-100 px-2.5 py-1.5 rounded text-xs font-bold transition"
-                        >
-                          Unlock &amp; Modify
-                        </button>
-                        <button
-                          onClick={() => downloadFinalPDF(b)}
-                          className="bg-slate-800 hover:bg-slate-900 text-white px-3 py-1.5 rounded text-xs font-bold transition shadow-sm"
-                        >
-                          Download PDF
-                        </button>
+
+                        {perms.canUnlock && (
+                          <button
+                            type="button"
+                            onClick={() => handleUnlock(b)}
+                            className="bg-white border text-slate-600 hover:bg-slate-100 px-2.5 py-1.5 rounded text-xs font-bold transition"
+                          >
+                            🔓 Unlock
+                          </button>
+                        )}
+
+                        {perms.canPrint && (
+                          <button
+                            type="button"
+                            onClick={() => handlePrintReport(b)}
+                            className="bg-[#0f2d4a] hover:bg-slate-900 text-white px-3.5 py-1.5 rounded text-xs font-bold transition shadow-sm"
+                          >
+                            🖨️ Print Report
+                          </button>
+                        )}
+
+                        {perms.canDownload && (
+                          <button
+                            type="button"
+                            onClick={() => handleDownloadPDF(b)}
+                            className="bg-blue-600 hover:bg-blue-700 text-white px-2.5 py-1.5 rounded text-xs font-bold transition"
+                          >
+                            📥 Download
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>
