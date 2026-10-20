@@ -1,5 +1,11 @@
 import React, { useState } from "react";
-import { collection, addDoc, deleteDoc, updateDoc, doc } from "firebase/firestore";
+import {
+  collection,
+  addDoc,
+  deleteDoc,
+  updateDoc,
+  doc
+} from "firebase/firestore";
 import { initializeApp } from "firebase/app";
 import { getAuth, createUserWithEmailAndPassword } from "firebase/auth";
 import { db, auth } from "../firebase";
@@ -10,6 +16,18 @@ export function StaffManageTab({ staffAccounts, fetchData }) {
   const [name, setName] = useState("");
   const [role, setRole] = useState("Lab Technician");
   const [isCreating, setIsCreating] = useState(false);
+
+  // Default permissions for a new staff account
+  const [perms, setPerms] = useState({
+    canPrint: true,
+    canWhatsapp: true,
+    canDownload: false, // Off by default so staff print directly instead of downloading
+    canUnlock: false,
+    accessWalkIn: true,
+    accessCollections: true,
+    accessLabDesk: true,
+    accessRecords: true
+  });
 
   const handleAddStaff = async (e) => {
     e.preventDefault();
@@ -39,6 +57,7 @@ export function StaffManageTab({ staffAccounts, fetchData }) {
         email: email.trim().toLowerCase(),
         password,
         disabled: false,
+        ...perms,
         createdAt: new Date().toISOString()
       });
 
@@ -46,7 +65,7 @@ export function StaffManageTab({ staffAccounts, fetchData }) {
       setPassword("");
       setName("");
       fetchData();
-      alert("Staff account created and activated!");
+      alert("Staff account created with configured permissions!");
     } catch (error) {
       console.error("Error creating staff:", error);
       alert("Failed to create staff account. Email may already be registered.");
@@ -54,12 +73,20 @@ export function StaffManageTab({ staffAccounts, fetchData }) {
     setIsCreating(false);
   };
 
+  // Toggle any boolean permission field on an existing staff member
+  const togglePermission = async (account, field, currentVal) => {
+    await updateDoc(doc(db, "staff_accounts", account.id), {
+      [field]: !currentVal
+    });
+    fetchData();
+  };
+
   const toggleStaffAccess = async (account) => {
     const nextState = !account.disabled;
     const actionWord = nextState ? "BLOCK" : "RESTORE";
     if (
       !window.confirm(
-        `Are you sure you want to ${actionWord} portal access for ${account.email}?`
+        `Are you sure you want to ${actionWord} portal login for ${account.email}?`
       )
     ) {
       return;
@@ -78,8 +105,9 @@ export function StaffManageTab({ staffAccounts, fetchData }) {
   };
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-      <div className="lg:col-span-1 bg-white p-6 rounded-xl border shadow-sm self-start">
+    <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+      {/* LEFT (4 Cols): Create Staff Account + Initial Permissions */}
+      <div className="lg:col-span-4 bg-white p-6 rounded-xl border shadow-sm self-start">
         <h3 className="font-bold text-slate-800 mb-4">Create Staff Account</h3>
         <form onSubmit={handleAddStaff} className="space-y-4">
           <div>
@@ -95,6 +123,7 @@ export function StaffManageTab({ staffAccounts, fetchData }) {
               required
             />
           </div>
+
           <div>
             <label className="block text-xs font-bold text-slate-500 mb-1">
               DESIGNATION / ROLE
@@ -109,6 +138,7 @@ export function StaffManageTab({ staffAccounts, fetchData }) {
               <option>Phlebotomist (Sample Collector)</option>
             </select>
           </div>
+
           <div>
             <label className="block text-xs font-bold text-slate-500 mb-1">
               LOGIN EMAIL (USERNAME)
@@ -122,6 +152,7 @@ export function StaffManageTab({ staffAccounts, fetchData }) {
               required
             />
           </div>
+
           <div>
             <label className="block text-xs font-bold text-slate-500 mb-1">
               ACCOUNT PASSWORD
@@ -135,91 +166,55 @@ export function StaffManageTab({ staffAccounts, fetchData }) {
               required
             />
           </div>
-          <button
-            type="submit"
-            disabled={isCreating}
-            className="w-full py-2.5 bg-slate-800 text-white font-bold rounded hover:bg-slate-900 transition disabled:opacity-50"
-          >
-            {isCreating ? "Creating Account..." : "Create Staff Account"}
-          </button>
-        </form>
-      </div>
 
-      <div className="lg:col-span-2 bg-white rounded-xl border shadow-sm overflow-hidden">
-        <table className="w-full text-left text-sm">
-          <thead className="bg-slate-50 border-b">
-            <tr>
-              <th className="p-4 text-slate-600 font-bold">Staff Member</th>
-              <th className="p-4 text-slate-600 font-bold">Credentials</th>
-              <th className="p-4 text-slate-600 font-bold">Status</th>
-              <th className="p-4 text-right text-slate-600 font-bold">
-                Access Control
-              </th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100">
-            {staffAccounts.length === 0 ? (
-              <tr>
-                <td colSpan="4" className="p-8 text-center text-slate-400">
-                  No staff accounts created yet.
-                </td>
-              </tr>
-            ) : (
-              staffAccounts.map((account) => (
-                <tr key={account.id} className="hover:bg-slate-50">
-                  <td className="p-4">
-                    <span className="font-bold text-slate-800 block">
-                      {account.name}
-                    </span>
-                    <span className="text-xs text-slate-500">
-                      {account.role || "Staff"}
-                    </span>
-                  </td>
-                  <td className="p-4">
-                    <span className="text-slate-700 block">
-                      {account.email}
-                    </span>
-                    <span className="text-xs font-mono text-slate-400">
-                      Pwd: {account.password}
-                    </span>
-                  </td>
-                  <td className="p-4">
-                    {account.disabled ? (
-                      <span className="bg-red-100 text-red-700 text-xs font-bold px-2.5 py-1 rounded border border-red-200">
-                        🚫 Blocked
-                      </span>
-                    ) : (
-                      <span className="bg-emerald-100 text-emerald-700 text-xs font-bold px-2.5 py-1 rounded border border-emerald-200">
-                        ✅ Active
-                      </span>
-                    )}
-                  </td>
-                  <td className="p-4 text-right space-x-2">
-                    <button
-                      onClick={() => toggleStaffAccess(account)}
-                      className={`px-3 py-1 rounded text-xs font-bold border transition ${
-                        account.disabled
-                          ? "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100"
-                          : "bg-amber-50 text-amber-800 border-amber-200 hover:bg-amber-100"
-                      }`}
-                    >
-                      {account.disabled ? "Unblock Login" : "Block Login"}
-                    </button>
-                    <button
-                      onClick={() =>
-                        removeStaffRecord(account.id, account.email)
-                      }
-                      className="text-red-500 hover:text-red-700 font-bold text-xs px-2"
-                    >
-                      Delete
-                    </button>
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  );
-}
+          {/* Report Action Permissions */}
+          <div className="bg-slate-50 p-3 rounded-lg border space-y-2">
+            <span className="block text-[11px] font-extrabold text-slate-600 uppercase">
+              Report &amp; Action Permissions
+            </span>
+            <label className="flex items-center gap-2 text-xs font-semibold text-slate-700 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={perms.canPrint}
+                onChange={(e) =>
+                  setPerms({ ...perms, canPrint: e.target.checked })
+                }
+              />
+              🖨️ Allow Direct Printout of Reports
+            </label>
+            <label className="flex items-center gap-2 text-xs font-semibold text-slate-700 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={perms.canWhatsapp}
+                onChange={(e) =>
+                  setPerms({ ...perms, canWhatsapp: e.target.checked })
+                }
+              />
+              📲 Allow WhatsApp Report Forwarding
+            </label>
+            <label className="flex items-center gap-2 text-xs font-semibold text-slate-700 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={perms.canDownload}
+                onChange={(e) =>
+                  setPerms({ ...perms, canDownload: e.target.checked })
+                }
+              />
+              📥 Allow PDF File Download to Computer
+            </label>
+            <label className="flex items-center gap-2 text-xs font-semibold text-slate-700 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={perms.canUnlock}
+                onChange={(e) =>
+                  setPerms({ ...perms, canUnlock: e.target.checked })
+                }
+              />
+              🔓 Allow Unlocking &amp; Modifying Final Reports
+            </label>
+          </div>
+
+          {/* Tab Visibility Restrictions */}
+          <div className="bg-slate-50 p-3 rounded-lg border space-y-2">
+            <span className="block text-[11px] font-extrabold text-slate-600 uppercase">
+              Allowed
