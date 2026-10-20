@@ -108,6 +108,14 @@ export function PastRecordsTab({
   const [recordDate, setRecordDate] = useState("");
   const [useLetterhead, setUseLetterhead] = useState(true);
 
+  // Late-stage inline discount & payment editor state
+  const [discountEditId, setDiscountEditId] = useState(null);
+  const [lateBillingForm, setLateBillingForm] = useState({
+    discount: 0,
+    cashPaid: 0,
+    upiPaid: 0
+  });
+
   const perms = staffPermissions || {
     canPrint: true,
     canWhatsapp: true,
@@ -126,7 +134,54 @@ export function PastRecordsTab({
     return matchText && matchDate;
   });
 
-  // DIRECT PRINTOUT HANDLER (NO FILE DOWNLOAD)
+  const openLateBillingEditor = (b) => {
+    setDiscountEditId(b.id);
+    setLateBillingForm({
+      discount: Number(b.discount || 0),
+      cashPaid: Number(b.cashPaid || 0),
+      upiPaid: Number(b.upiPaid || 0)
+    });
+  };
+
+  const saveLateBillingAndDiscount = async (b) => {
+    const itemsSum = (b.cartItems || b.tests || []).reduce(
+      (sum, t) => sum + Number(t.discountedPrice || t.price || 0),
+      0
+    );
+    const grossSubtotal = Number(
+      b.subtotal || itemsSum || Number(b.total || 0) + Number(b.discount || 0)
+    );
+    const newDiscount = Math.min(
+      grossSubtotal,
+      Math.max(0, Number(lateBillingForm.discount || 0))
+    );
+    const discountedNetPrice = Math.max(0, grossSubtotal - newDiscount);
+    const deliveryFee = Number(b.deliveryFee || 0);
+    const newTotal = discountedNetPrice + deliveryFee;
+
+    const newCash = Number(lateBillingForm.cashPaid || 0);
+    const newUpi = Number(lateBillingForm.upiPaid || 0);
+    const newBalance = Math.max(0, newTotal - (newCash + newUpi));
+
+    await updateDoc(doc(db, "bookings", b.id), {
+      subtotal: grossSubtotal,
+      discount: newDiscount,
+      discountedTotal: discountedNetPrice,
+      total: newTotal,
+      cashPaid: newCash,
+      upiPaid: newUpi,
+      balanceDue: newBalance,
+      history: arrayUnion({
+        action: `Late-Stage Discount & Payment Updated (Gross: ₹${grossSubtotal}, Discount: ₹${newDiscount}, Discounted Price: ₹${discountedNetPrice}, Balance Due: ₹${newBalance})`,
+        by: userEmail,
+        time: new Date().toISOString()
+      })
+    });
+
+    setDiscountEditId(null);
+    fetchData();
+  };
+
   const handlePrintReport = async (b) => {
     if (!perms.canPrint) {
       return alert(
@@ -172,7 +227,6 @@ export function PastRecordsTab({
     fetchData();
   };
 
-  // WHATSAPP FORWARD HANDLER (PERMISSION GUARDED + AUDIT LOGGED)
   const handleWhatsappForward = async (b) => {
     if (!perms.canWhatsapp) {
       return alert(
@@ -206,7 +260,6 @@ export function PastRecordsTab({
     fetchData();
   };
 
-  // OPTIONAL DOWNLOAD HANDLER (ONLY IF ADMIN EXPLICITLY ALLOWS DOWNLOAD)
   const handleDownloadPDF = async (b) => {
     if (!perms.canDownload) {
       return alert(
@@ -246,14 +299,8 @@ export function PastRecordsTab({
   };
 
   const handleUnlock = async (b) => {
-    if (!perms.canUnlock) {
-      return alert(
-        "Access Restricted: Only authorized accounts can unlock and modify finalized reports."
-      );
-    }
-
     const msg =
-      "Unlock this record? This will move it back to the Lab Desk so you can modify patient details, tests, billing, and results.";
+      "Open this record in the Lab Result Desk Modify Panel to edit patient details, referring doctor, tests, or discount?";
     if (!window.confirm(msg)) return;
 
     const unpackedTests = expandTests(b.tests || b.cartItems || []);
@@ -279,7 +326,6 @@ export function PastRecordsTab({
 
   return (
     <div>
-      {/* Search, Date Filter & Letterhead Print Mode Bar */}
       <div className="flex flex-wrap items-center gap-3 mb-4 bg-slate-50 p-3 rounded-lg border">
         <input
           type="text"
@@ -322,7 +368,9 @@ export function PastRecordsTab({
             <tr>
               <th className="p-4 font-bold text-slate-600">ID / Date</th>
               <th className="p-4 font-bold text-slate-600">Patient</th>
-              <th className="p-4 font-bold text-slate-600">Billing</th>
+              <th className="p-4 font-bold text-slate-600">
+                Billing &amp; Discount
+              </th>
               <th className="p-4 font-bold text-slate-600">Print Status</th>
               <th className="p-4 text-right">Authorized Actions</th>
             </tr>
@@ -344,109 +392,237 @@ export function PastRecordsTab({
                   )
                   .join(" | ");
 
+                const grossAmt = Number(
+                  b.subtotal || Number(b.total || 0) + Number(b.discount || 0)
+                );
+
                 return (
-                  <tr key={b.id} className="hover:bg-slate-50">
-                    <td className="p-4 font-mono text-slate-500">
-                      <span className="block font-bold text-slate-800">
-                        {b.clinicalId}
-                      </span>
-                      {b.date}
-                    </td>
-                    <td className="p-4 font-semibold text-slate-800">
-                      {b.name}
-                      <span className="block text-xs font-normal text-slate-500">
-                        {b.age || "N/A"}Y / {b.gender || "N/A"} |{" "}
-                        {b.phone || "N/A"}
-                      </span>
-                    </td>
-                    <td className="p-4">
-                      <span className="font-bold text-slate-800 block">
-                        ₹{b.total || 0}
-                      </span>
-                      {Number(b.balanceDue || 0) > 0 ? (
-                        <span className="text-[11px] font-bold text-red-600 bg-red-50 px-1.5 py-0.5 rounded border border-red-200">
-                          Due: ₹{b.balanceDue}
+                  <React.Fragment key={b.id}>
+                    <tr className="hover:bg-slate-50">
+                      <td className="p-4 font-mono text-slate-500">
+                        <span className="block font-bold text-slate-800">
+                          {b.clinicalId}
                         </span>
-                      ) : (
-                        <span className="text-[11px] font-bold text-emerald-700">
-                          Paid in Full
+                        {b.date}
+                      </td>
+                      <td className="p-4 font-semibold text-slate-800">
+                        {b.name}
+                        <span className="block text-xs font-normal text-slate-500">
+                          {b.age || "N/A"}Y / {b.gender || "N/A"} |{" "}
+                          {b.phone || "N/A"}
                         </span>
-                      )}
-                    </td>
-                    <td className="p-4">
-                      {b.reportGenerated ? (
-                        <span className="text-xs bg-emerald-100 text-emerald-800 px-2 py-1 rounded font-bold border border-emerald-200">
-                          ✅ Printed by {b.reportGeneratedBy}
+                        <span className="block text-[11px] font-bold text-blue-700 mt-0.5">
+                          Ref: {getDoctorName(b)}
                         </span>
-                      ) : (
-                        <span className="text-xs bg-amber-100 text-amber-800 px-2 py-1 rounded font-bold border border-amber-200">
-                          ⏳ Ready to Print
+                      </td>
+                      <td className="p-4">
+                        <span className="font-bold text-slate-800 block">
+                          Net: ₹{b.total || 0}
                         </span>
-                      )}
-
-                      {logList.length > 0 && (
-                        <div className="mt-1.5 text-xs text-slate-500">
-                          <span
-                            className="font-bold underline cursor-help"
-                            title={downloadTooltip}
-                          >
-                            Printed/Issued {logList.length} time(s)
+                        {Number(b.discount || 0) > 0 && (
+                          <span className="text-[11px] font-bold text-amber-700 block">
+                            Orig: ₹{grossAmt} | Disc: &minus;₹{b.discount}
                           </span>
-                        </div>
-                      )}
-                    </td>
-                    <td className="p-4 text-right">
-                      <div className="flex flex-wrap justify-end gap-1.5">
-                        <button
-                          type="button"
-                          onClick={() => printBillPDFDirectly(b)}
-                          className="bg-white border text-slate-700 hover:bg-slate-100 px-2.5 py-1.5 rounded text-xs font-bold transition"
-                        >
-                          🧾 Print Bill
-                        </button>
-
-                        {perms.canWhatsapp && b.phone && (
-                          <button
-                            type="button"
-                            onClick={() => handleWhatsappForward(b)}
-                            className="bg-emerald-50 border border-emerald-200 text-emerald-700 hover:bg-emerald-100 px-2.5 py-1.5 rounded text-xs font-bold transition"
-                          >
-                            📲 WhatsApp
-                          </button>
+                        )}
+                        {Number(b.balanceDue || 0) > 0 ? (
+                          <span className="text-[11px] font-bold text-red-600 bg-red-50 px-1.5 py-0.5 rounded border border-red-200 inline-block mt-0.5">
+                            Due: ₹{b.balanceDue}
+                          </span>
+                        ) : (
+                          <span className="text-[11px] font-bold text-emerald-700">
+                            Paid in Full
+                          </span>
+                        )}
+                      </td>
+                      <td className="p-4">
+                        {b.reportGenerated ? (
+                          <span className="text-xs bg-emerald-100 text-emerald-800 px-2 py-1 rounded font-bold border border-emerald-200">
+                            ✅ Printed by {b.reportGeneratedBy}
+                          </span>
+                        ) : (
+                          <span className="text-xs bg-amber-100 text-amber-800 px-2 py-1 rounded font-bold border border-amber-200">
+                            ⏳ Ready to Print
+                          </span>
                         )}
 
-                        {perms.canUnlock && (
+                        {logList.length > 0 && (
+                          <div className="mt-1.5 text-xs text-slate-500">
+                            <span
+                              className="font-bold underline cursor-help"
+                              title={downloadTooltip}
+                            >
+                              Printed/Issued {logList.length} time(s)
+                            </span>
+                          </div>
+                        )}
+                      </td>
+                      <td className="p-4 text-right">
+                        <div className="flex flex-wrap justify-end gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              discountEditId === b.id
+                                ? setDiscountEditId(null)
+                                : openLateBillingEditor(b)
+                            }
+                            className="bg-amber-50 border border-amber-300 text-amber-900 hover:bg-amber-100 px-2.5 py-1.5 rounded text-xs font-bold transition"
+                          >
+                            🏷️ Discount / Pay
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => printBillPDFDirectly(b)}
+                            className="bg-white border text-slate-700 hover:bg-slate-100 px-2.5 py-1.5 rounded text-xs font-bold transition"
+                          >
+                            🧾 Print Bill
+                          </button>
+
+                          {perms.canWhatsapp && b.phone && (
+                            <button
+                              type="button"
+                              onClick={() => handleWhatsappForward(b)}
+                              className="bg-emerald-50 border border-emerald-200 text-emerald-700 hover:bg-emerald-100 px-2.5 py-1.5 rounded text-xs font-bold transition"
+                            >
+                              📲 WhatsApp
+                            </button>
+                          )}
+
                           <button
                             type="button"
                             onClick={() => handleUnlock(b)}
                             className="bg-white border text-slate-600 hover:bg-slate-100 px-2.5 py-1.5 rounded text-xs font-bold transition"
                           >
-                            🔓 Unlock
+                            🔓 Modify
                           </button>
-                        )}
 
-                        {perms.canPrint && (
-                          <button
-                            type="button"
-                            onClick={() => handlePrintReport(b)}
-                            className="bg-[#0f2d4a] hover:bg-slate-900 text-white px-3.5 py-1.5 rounded text-xs font-bold transition shadow-sm"
-                          >
-                            🖨️ Print Report
-                          </button>
-                        )}
+                          {perms.canPrint && (
+                            <button
+                              type="button"
+                              onClick={() => handlePrintReport(b)}
+                              className="bg-[#0f2d4a] hover:bg-slate-900 text-white px-3.5 py-1.5 rounded text-xs font-bold transition shadow-sm"
+                            >
+                              🖨️ Print Report
+                            </button>
+                          )}
 
-                        {perms.canDownload && (
-                          <button
-                            type="button"
-                            onClick={() => handleDownloadPDF(b)}
-                            className="bg-blue-600 hover:bg-blue-700 text-white px-2.5 py-1.5 rounded text-xs font-bold transition"
-                          >
-                            📥 Download
-                          </button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
+                          {perms.canDownload && (
+                            <button
+                              type="button"
+                              onClick={() => handleDownloadPDF(b)}
+                              className="bg-blue-600 hover:bg-blue-700 text-white px-2.5 py-1.5 rounded text-xs font-bold transition"
+                            >
+                              📥 Download
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+
+                    {/* INLINE LATE-STAGE DISCOUNT & PAYMENT BAR */}
+                    {discountEditId === b.id && (
+                      <tr className="bg-amber-50/70">
+                        <td
+                          colSpan="5"
+                          className="p-4 border-l-4 border-amber-500"
+                        >
+                          <div className="flex flex-wrap items-center justify-between gap-4">
+                            <div>
+                              <h4 className="text-xs font-extrabold text-amber-950 uppercase">
+                                Late-Stage Discount &amp; Payment Settlement —{" "}
+                                {b.name}
+                              </h4>
+                              <p className="text-[11px] text-slate-600">
+                                Original Subtotal: <b>₹{grossAmt}</b> | New
+                                Discounted Total:{" "}
+                                <b className="text-emerald-700">
+                                  ₹
+                                  {Math.max(
+                                    0,
+                                    grossAmt -
+                                      Number(lateBillingForm.discount || 0)
+                                  )}
+                                </b>{" "}
+                                (Automatically updates Doctor Ledger)
+                              </p>
+                            </div>
+
+                            <div className="flex flex-wrap items-center gap-3">
+                              <div>
+                                <label className="block text-[10px] font-bold text-amber-900">
+                                  DISCOUNT (₹)
+                                </label>
+                                <input
+                                  type="number"
+                                  min="0"
+                                  max={grossAmt}
+                                  value={lateBillingForm.discount}
+                                  onChange={(e) =>
+                                    setLateBillingForm({
+                                      ...lateBillingForm,
+                                      discount: e.target.value
+                                    })
+                                  }
+                                  className="w-24 p-1.5 border border-amber-400 rounded text-xs font-bold bg-white"
+                                />
+                              </div>
+
+                              <div>
+                                <label className="block text-[10px] font-bold text-slate-600">
+                                  CASH PAID (₹)
+                                </label>
+                                <input
+                                  type="number"
+                                  value={lateBillingForm.cashPaid}
+                                  onChange={(e) =>
+                                    setLateBillingForm({
+                                      ...lateBillingForm,
+                                      cashPaid: e.target.value
+                                    })
+                                  }
+                                  className="w-24 p-1.5 border rounded text-xs font-bold bg-white"
+                                />
+                              </div>
+
+                              <div>
+                                <label className="block text-[10px] font-bold text-slate-600">
+                                  UPI PAID (₹)
+                                </label>
+                                <input
+                                  type="number"
+                                  value={lateBillingForm.upiPaid}
+                                  onChange={(e) =>
+                                    setLateBillingForm({
+                                      ...lateBillingForm,
+                                      upiPaid: e.target.value
+                                    })
+                                  }
+                                  className="w-24 p-1.5 border rounded text-xs font-bold bg-white"
+                                />
+                              </div>
+
+                              <div className="flex gap-2 pt-3">
+                                <button
+                                  type="button"
+                                  onClick={() => saveLateBillingAndDiscount(b)}
+                                  className="bg-emerald-600 hover:bg-emerald-700 text-white px-3.5 py-1.5 rounded text-xs font-bold shadow-sm"
+                                >
+                                  Save Discount &amp; Sync Ledger
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setDiscountEditId(null)}
+                                  className="bg-white border text-slate-600 px-3 py-1.5 rounded text-xs font-bold"
+                                >
+                                  Cancel
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </React.Fragment>
                 );
               })
             )}
