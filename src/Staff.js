@@ -1,6 +1,10 @@
 import React, { useEffect, useState, useCallback } from "react";
 import { db, auth } from "./firebase";
-import { signInWithEmailAndPassword, signOut, onAuthStateChanged } from "firebase/auth";
+import {
+  signInWithEmailAndPassword,
+  signOut,
+  onAuthStateChanged
+} from "firebase/auth";
 import { collection, getDocs } from "firebase/firestore";
 
 import {
@@ -12,6 +16,8 @@ import { WalkInTab } from "./Staff/WalkInTab";
 import { CollectionsTab, PastRecordsTab } from "./Staff/CollectionsAndRecords";
 import { LabDeskTab } from "./Staff/LabDeskTab";
 
+const ADMIN_EMAILS = ["vasavikalvakolanu@gmail.com", "satyahanush@gmail.com"];
+
 function Staff() {
   const [user, setUser] = useState(null);
   const [email, setEmail] = useState("");
@@ -22,6 +28,17 @@ function Staff() {
   const [categories, setCategories] = useState([]);
   const [packages, setPackages] = useState([]);
   const [referrals, setReferrals] = useState([]);
+
+  const [staffPermissions, setStaffPermissions] = useState({
+    canPrint: true,
+    canWhatsapp: true,
+    canDownload: false,
+    canUnlock: false,
+    accessWalkIn: true,
+    accessCollections: true,
+    accessLabDesk: true,
+    accessRecords: true
+  });
 
   const [processingBooking, setProcessingBooking] = useState(null);
   const [startInEditMode, setStartInEditMode] = useState(false);
@@ -37,16 +54,47 @@ function Staff() {
           getDocs(collection(db, "staff_accounts")).catch(() => null)
         ]);
 
-      if (snapStaff && auth.currentUser) {
+      if (auth.currentUser) {
         const currentEmail = (auth.currentUser.email || "").toLowerCase();
-        const matchedStaff = snapStaff.docs
-          .map((d) => d.data())
-          .find((s) => (s.email || "").toLowerCase() === currentEmail);
 
-        if (matchedStaff && matchedStaff.disabled) {
-          alert("Your staff account has been disabled by the Administrator.");
-          await signOut(auth);
-          return;
+        // Admins automatically get full unrestricted permissions
+        if (ADMIN_EMAILS.includes(currentEmail)) {
+          setStaffPermissions({
+            canPrint: true,
+            canWhatsapp: true,
+            canDownload: true,
+            canUnlock: true,
+            accessWalkIn: true,
+            accessCollections: true,
+            accessLabDesk: true,
+            accessRecords: true
+          });
+        } else if (snapStaff) {
+          const matchedStaff = snapStaff.docs
+            .map((d) => d.data())
+            .find((s) => (s.email || "").toLowerCase() === currentEmail);
+
+          if (matchedStaff) {
+            if (matchedStaff.disabled) {
+              alert(
+                "Your staff account has been disabled by the Administrator."
+              );
+              await signOut(auth);
+              return;
+            }
+
+            const loadedPerms = {
+              canPrint: matchedStaff.canPrint !== false,
+              canWhatsapp: matchedStaff.canWhatsapp !== false,
+              canDownload: Boolean(matchedStaff.canDownload),
+              canUnlock: Boolean(matchedStaff.canUnlock),
+              accessWalkIn: matchedStaff.accessWalkIn !== false,
+              accessCollections: matchedStaff.accessCollections !== false,
+              accessLabDesk: matchedStaff.accessLabDesk !== false,
+              accessRecords: matchedStaff.accessRecords !== false
+            };
+            setStaffPermissions(loadedPerms);
+          }
         }
       }
 
@@ -74,6 +122,22 @@ function Staff() {
     });
     return () => unsubscribe();
   }, [fetchData]);
+
+  // Automatically switch to the first allowed tab if current tab is restricted
+  useEffect(() => {
+    const allowedMap = {
+      registration: staffPermissions.accessWalkIn,
+      collections: staffPermissions.accessCollections,
+      processing: staffPermissions.accessLabDesk,
+      records: staffPermissions.accessRecords
+    };
+    if (!allowedMap[activeView]) {
+      if (staffPermissions.accessWalkIn) setActiveView("registration");
+      else if (staffPermissions.accessCollections) setActiveView("collections");
+      else if (staffPermissions.accessLabDesk) setActiveView("processing");
+      else if (staffPermissions.accessRecords) setActiveView("records");
+    }
+  }, [staffPermissions, activeView]);
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -175,7 +239,19 @@ function Staff() {
             </div>
           </div>
 
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3">
+            <div className="hidden md:flex items-center gap-1.5 text-[11px]">
+              {staffPermissions.canPrint && (
+                <span className="bg-slate-100 text-slate-700 px-2 py-0.5 rounded border font-semibold">
+                  🖨️ Print
+                </span>
+              )}
+              {staffPermissions.canWhatsapp && (
+                <span className="bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded border border-emerald-200 font-semibold">
+                  📲 WhatsApp
+                </span>
+              )}
+            </div>
             <span className="text-xs font-bold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded border border-emerald-200">
               {user.email}
             </span>
@@ -192,63 +268,74 @@ function Staff() {
       <div className="max-w-7xl mx-auto px-6 mt-8">
         <div className="bg-white rounded border shadow-sm p-6">
           <div className="flex flex-wrap gap-4 mb-6 border-b pb-4">
-            <button
-              onClick={() => {
-                setActiveView("registration");
-                setProcessingBooking(null);
-              }}
-              className={`px-4 py-2 text-sm font-medium rounded ${
-                activeView === "registration"
-                  ? "bg-emerald-600 text-white"
-                  : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-              }`}
-            >
-              1. Front Desk Walk-In
-            </button>
-            <button
-              onClick={() => {
-                setActiveView("collections");
-                setProcessingBooking(null);
-              }}
-              className={`px-4 py-2 text-sm font-medium rounded flex items-center ${
-                activeView === "collections"
-                  ? "bg-emerald-600 text-white"
-                  : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-              }`}
-            >
-              2. Web Collections
-              {pendingBookings.length > 0 && (
-                <span className="bg-amber-500 text-white text-xs px-2 py-0.5 rounded-full ml-2">
-                  {pendingBookings.length}
-                </span>
-              )}
-            </button>
-            <button
-              onClick={() => setActiveView("processing")}
-              className={`px-4 py-2 text-sm font-medium rounded ${
-                activeView === "processing"
-                  ? "bg-emerald-600 text-white"
-                  : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-              }`}
-            >
-              3. Lab Result Desk ({processingBookings.length})
-            </button>
-            <button
-              onClick={() => {
-                setActiveView("records");
-                setProcessingBooking(null);
-              }}
-              className={`px-4 py-2 text-sm font-medium rounded ${
-                activeView === "records"
-                  ? "bg-slate-800 text-white"
-                  : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-              }`}
-            >
-              4. Past Records ({pastRecords.length})
-            </button>
+            {staffPermissions.accessWalkIn && (
+              <button
+                onClick={() => {
+                  setActiveView("registration");
+                  setProcessingBooking(null);
+                }}
+                className={`px-4 py-2 text-sm font-medium rounded ${
+                  activeView === "registration"
+                    ? "bg-emerald-600 text-white"
+                    : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                }`}
+              >
+                1. Front Desk Walk-In
+              </button>
+            )}
+
+            {staffPermissions.accessCollections && (
+              <button
+                onClick={() => {
+                  setActiveView("collections");
+                  setProcessingBooking(null);
+                }}
+                className={`px-4 py-2 text-sm font-medium rounded flex items-center ${
+                  activeView === "collections"
+                    ? "bg-emerald-600 text-white"
+                    : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                }`}
+              >
+                2. Web Collections
+                {pendingBookings.length > 0 && (
+                  <span className="bg-amber-500 text-white text-xs px-2 py-0.5 rounded-full ml-2">
+                    {pendingBookings.length}
+                  </span>
+                )}
+              </button>
+            )}
+
+            {staffPermissions.accessLabDesk && (
+              <button
+                onClick={() => setActiveView("processing")}
+                className={`px-4 py-2 text-sm font-medium rounded ${
+                  activeView === "processing"
+                    ? "bg-emerald-600 text-white"
+                    : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                }`}
+              >
+                3. Lab Result Desk ({processingBookings.length})
+              </button>
+            )}
+
+            {staffPermissions.accessRecords && (
+              <button
+                onClick={() => {
+                  setActiveView("records");
+                  setProcessingBooking(null);
+                }}
+                className={`px-4 py-2 text-sm font-medium rounded ${
+                  activeView === "records"
+                    ? "bg-slate-800 text-white"
+                    : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                }`}
+              >
+                4. Past Records ({pastRecords.length})
+              </button>
+            )}
           </div>
 
-          {activeView === "registration" && (
+          {activeView === "registration" && staffPermissions.accessWalkIn && (
             <WalkInTab
               categories={categories}
               packages={packages}
@@ -260,16 +347,17 @@ function Staff() {
             />
           )}
 
-          {activeView === "collections" && (
-            <CollectionsTab
-              pendingBookings={pendingBookings}
-              expandTests={expandTests}
-              userEmail={user.email}
-              fetchData={fetchData}
-            />
-          )}
+          {activeView === "collections" &&
+            staffPermissions.accessCollections && (
+              <CollectionsTab
+                pendingBookings={pendingBookings}
+                expandTests={expandTests}
+                userEmail={user.email}
+                fetchData={fetchData}
+              />
+            )}
 
-          {activeView === "processing" && (
+          {activeView === "processing" && staffPermissions.accessLabDesk && (
             <LabDeskTab
               processingBookings={processingBookings}
               processingBooking={processingBooking}
@@ -286,12 +374,13 @@ function Staff() {
             />
           )}
 
-          {activeView === "records" && (
+          {activeView === "records" && staffPermissions.accessRecords && (
             <PastRecordsTab
               pastRecords={pastRecords}
               getDoctorName={getDoctorName}
               expandTests={expandTests}
               userEmail={user.email}
+              staffPermissions={staffPermissions}
               fetchData={fetchData}
               onUnlockRecord={(unlockedBooking) => {
                 setProcessingBooking(unlockedBooking);
