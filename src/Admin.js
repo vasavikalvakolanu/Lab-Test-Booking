@@ -1,6 +1,10 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { db, auth } from "./firebase";
-import { signInWithEmailAndPassword, signOut, onAuthStateChanged } from "firebase/auth";
+import {
+  signInWithEmailAndPassword,
+  signOut,
+  onAuthStateChanged
+} from "firebase/auth";
 import { collection, getDocs, doc, getDoc } from "firebase/firestore";
 
 import { SriBalajiLogoSVG } from "./Staff/staffUtils";
@@ -27,6 +31,8 @@ function Admin() {
   const [staffAccounts, setStaffAccounts] = useState([]);
   const [settings, setSettings] = useState({
     deliveryEnabled: true,
+    homeVisitFee: 100,
+    freeDeliveryThreshold: 999,
     maxDistance: 10,
     centers: [],
     tiers: []
@@ -35,30 +41,7 @@ function Admin() {
   const [search, setSearch] = useState("");
   const [selectedDate, setSelectedDate] = useState("");
 
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-      setUser(currentUser);
-      if (currentUser) fetchData();
-    });
-    return () => unsubscribe();
-  }, []);
-
-  const handleLogin = async (e) => {
-    e.preventDefault();
-    if (!ADMIN_EMAILS.includes(email.toLowerCase())) {
-      alert(
-        "Access Denied. Admin privileges required. Please use the Staff Portal."
-      );
-      return;
-    }
-    try {
-      await signInWithEmailAndPassword(auth, email, password);
-    } catch (error) {
-      alert("Authentication failed. Please check credentials.");
-    }
-  };
-
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     try {
       const [
         snapBookings,
@@ -74,8 +57,8 @@ function Admin() {
         getDocs(collection(db, "packages")),
         getDocs(collection(db, "coupons")),
         getDocs(collection(db, "referrals")),
-        getDoc(doc(db, "settings", "general")),
-        getDocs(collection(db, "staff_accounts"))
+        getDoc(doc(db, "settings", "general")).catch(() => null),
+        getDocs(collection(db, "staff_accounts")).catch(() => null)
       ]);
 
       const sortedBookings = snapBookings.docs
@@ -91,22 +74,52 @@ function Admin() {
       setPackages(snapPkgs.docs.map((d) => ({ id: d.id, ...d.data() })));
       setCoupons(snapCoupons.docs.map((d) => ({ id: d.id, ...d.data() })));
       setReferrals(snapRefs.docs.map((d) => ({ id: d.id, ...d.data() })));
-      setStaffAccounts(snapStaff.docs.map((d) => ({ id: d.id, ...d.data() })));
 
-      if (snapSettings.exists()) setSettings(snapSettings.data());
+      if (snapStaff) {
+        setStaffAccounts(snapStaff.docs.map((d) => ({ id: d.id, ...d.data() })));
+      }
+
+      if (snapSettings && snapSettings.exists()) {
+        setSettings((prev) => ({ ...prev, ...snapSettings.data() }));
+      }
     } catch (error) {
       console.error("Data fetch error:", error);
+    }
+  }, []);
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      setUser(currentUser);
+      if (currentUser) fetchData();
+    });
+    return () => unsubscribe();
+  }, [fetchData]);
+
+  const handleLogin = async (e) => {
+    e.preventDefault();
+    if (!ADMIN_EMAILS.includes(email.trim().toLowerCase())) {
+      alert(
+        "Access Denied. Admin privileges required. Please use the Staff Portal."
+      );
+      return;
+    }
+    try {
+      await signInWithEmailAndPassword(auth, email.trim(), password);
+    } catch (error) {
+      alert("Authentication failed. Please check credentials.");
     }
   };
 
   const filterData = (data) =>
     data.filter((b) => {
-      const nameMatch = b.name
-        ? b.name.toLowerCase().includes(search.toLowerCase())
-        : false;
+      const q = search.toLowerCase();
+      const nameMatch = b.name ? b.name.toLowerCase().includes(q) : false;
       const phoneMatch = b.phone ? b.phone.includes(search) : false;
+      const idMatch = b.clinicalId
+        ? b.clinicalId.toLowerCase().includes(q)
+        : false;
       const dateMatch = !selectedDate || b.date === selectedDate;
-      return (nameMatch || phoneMatch) && dateMatch;
+      return (!search || nameMatch || phoneMatch || idMatch) && dateMatch;
     });
 
   const liveBookings = filterData(
@@ -165,7 +178,7 @@ function Admin() {
     );
   }
 
-  if (!ADMIN_EMAILS.includes(user.email.toLowerCase())) {
+  if (!ADMIN_EMAILS.includes((user.email || "").toLowerCase())) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 text-center p-4">
         <h2 className="text-2xl font-bold text-red-600 mb-4">
@@ -245,13 +258,13 @@ function Admin() {
 
       <div className="max-w-7xl mx-auto px-6 mt-8">
         {activeTab === "records" && (
-          <div className="flex gap-4 mb-6 bg-white p-4 rounded border shadow-sm">
+          <div className="flex flex-wrap gap-4 mb-6 bg-white p-4 rounded border shadow-sm">
             <input
               type="text"
-              placeholder="Search patient name or phone..."
+              placeholder="Search patient name, phone, or Clinical ID..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="flex-1 p-2 border rounded text-sm outline-none focus:border-slate-500"
+              className="flex-1 min-w-[220px] p-2 border rounded text-sm outline-none focus:border-slate-500"
             />
             <input
               type="date"
@@ -259,6 +272,18 @@ function Admin() {
               onChange={(e) => setSelectedDate(e.target.value)}
               className="p-2 border rounded text-sm outline-none focus:border-slate-500"
             />
+            {(search || selectedDate) && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSearch("");
+                  setSelectedDate("");
+                }}
+                className="px-3 py-2 bg-slate-100 hover:bg-slate-200 rounded text-xs font-bold text-slate-600"
+              >
+                Clear
+              </button>
+            )}
           </div>
         )}
 
@@ -270,31 +295,43 @@ function Admin() {
             fetchData={fetchData}
           />
         )}
+
         {activeTab === "catalog" && (
           <CatalogTab categories={categories} fetchData={fetchData} />
         )}
+
         {activeTab === "packages" && (
-          <PackagesTab packages={packages} fetchData={fetchData} />
+          <PackagesTab
+            packages={packages}
+            categories={categories}
+            fetchData={fetchData}
+          />
         )}
+
         {activeTab === "referrals" && (
           <ReferralsTab
             referrals={referrals}
             pastRecords={pastRecords}
+            bookings={bookings}
             fetchData={fetchData}
           />
         )}
+
         {activeTab === "coupons" && (
           <CouponsTab coupons={coupons} fetchData={fetchData} />
         )}
+
         {activeTab === "settings" && (
           <SettingsTab settings={settings} setSettings={setSettings} />
         )}
+
         {activeTab === "staff" && (
           <StaffManageTab
             staffAccounts={staffAccounts}
             fetchData={fetchData}
           />
         )}
+
         {activeTab === "records" && <RecordsTab pastRecords={pastRecords} />}
       </div>
     </div>
