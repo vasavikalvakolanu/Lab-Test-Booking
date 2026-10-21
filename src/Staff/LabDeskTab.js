@@ -4,6 +4,7 @@ import { db } from "../firebase";
 import {
   getTestKey,
   evaluateAutoFlag,
+  resolveTestRefAndUnit,
   SriBalajiLogoSVG
 } from "./staffUtils";
 
@@ -88,12 +89,10 @@ export function LabDeskTab({
     });
   };
 
-  // Calculate live financials inside the Modify Panel
   const itemsPriceSum = editableTests.reduce(
     (sum, t) => sum + Number(t.discountedPrice || t.price || 0),
     0
   );
-  // Fallback to existing subtotal if unpacked tests don't carry individual prices
   const liveGrossSubtotal =
     itemsPriceSum > 0
       ? itemsPriceSum
@@ -167,16 +166,27 @@ export function LabDeskTab({
 
     setEditMode(false);
     fetchData();
-    alert(
-      `Record updated! Discounted Price (₹${liveDiscountedNetPrice}) is now synced with the Doctor Ledger.`
-    );
+    alert("Patient details, tests, and discount updated!");
   };
 
   const saveResults = async () => {
     if (!window.confirm("Lock these results and finalize the report?")) return;
 
+    // Ensure resolved refRange and unit are saved onto each test object
+    const enrichedTests = (processingBooking.tests || []).map((t, idx) => {
+      const key = getTestKey(t, idx);
+      const resObj = (results && (results[key] || results[t.name])) || {};
+      const resolved = resolveTestRefAndUnit(t);
+      return {
+        ...t,
+        refRange: resObj.customRefRange || resolved.refRange || "-",
+        unit:
+          resObj.customUnit !== undefined ? resObj.customUnit : resolved.unit
+      };
+    });
+
     await updateDoc(doc(db, "bookings", processingBooking.id), {
-      tests: processingBooking.tests,
+      tests: enrichedTests,
       results,
       status: "completed",
       history: arrayUnion({
@@ -199,7 +209,9 @@ export function LabDeskTab({
             <tr>
               <th className="p-4 font-bold text-slate-600">Clinical ID</th>
               <th className="p-4 font-bold text-slate-600">Patient</th>
-              <th className="p-4 font-bold text-slate-600">Billing &amp; Discount</th>
+              <th className="p-4 font-bold text-slate-600">
+                Billing &amp; Discount
+              </th>
               <th className="p-4 font-bold text-slate-600">Required Tests</th>
               <th className="p-4 text-right">Action</th>
             </tr>
@@ -326,7 +338,7 @@ export function LabDeskTab({
         </div>
       </div>
 
-      {/* MODIFY STAGE PANEL (PATIENT, REFERRAL DOCTOR, TESTS, DISCOUNT & BILLING) */}
+      {/* MODIFY STAGE PANEL */}
       {editMode && (
         <div className="mb-6 border-2 border-emerald-500 bg-emerald-50/70 rounded-xl p-5 shadow-inner">
           <div className="flex justify-between items-center border-b border-emerald-200 pb-2 mb-4">
@@ -335,7 +347,7 @@ export function LabDeskTab({
               Discount
             </h3>
             <span className="text-xs font-bold text-emerald-800 bg-emerald-100 px-2.5 py-1 rounded">
-              Changes sync automatically with Doctor Ledger
+              Syncs automatically with Doctor Ledger
             </span>
           </div>
 
@@ -402,7 +414,7 @@ export function LabDeskTab({
 
             <div>
               <label className="text-xs font-bold text-slate-500 block mb-1">
-                REFERRING DOCTOR (FOR LEDGER)
+                REFERRING DOCTOR
               </label>
               <select
                 value={editPatient.doctorId}
@@ -452,22 +464,6 @@ export function LabDeskTab({
                 <option value="home">Home Collection</option>
               </select>
             </div>
-
-            {editPatient.collectionType === "home" && (
-              <div className="md:col-span-3">
-                <label className="text-xs font-bold text-slate-500 block mb-1">
-                  HOME COLLECTION ADDRESS
-                </label>
-                <input
-                  type="text"
-                  value={editPatient.address}
-                  onChange={(e) =>
-                    setEditPatient({ ...editPatient, address: e.target.value })
-                  }
-                  className="w-full p-2 border rounded text-sm outline-none focus:border-emerald-500"
-                />
-              </div>
-            )}
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
@@ -522,9 +518,7 @@ export function LabDeskTab({
               </div>
             </div>
 
-            {/* DISCOUNT & FINANCIAL ADJUSTMENT CARD */}
             <div className="bg-white p-4 rounded-lg border shadow-sm">
-              {/* Highlighted Discount Input */}
               <div className="bg-amber-50 border border-amber-300 p-3 rounded-lg mb-4 flex items-center justify-between">
                 <div>
                   <label className="text-xs font-extrabold text-amber-900 block">
@@ -582,27 +576,8 @@ export function LabDeskTab({
                     className="w-full p-2 border rounded font-medium outline-none mt-1"
                   />
                 </div>
-                {editPatient.collectionType === "home" && (
-                  <div className="col-span-2">
-                    <label className="text-xs font-bold text-slate-500">
-                      HOME VISIT FEE (₹)
-                    </label>
-                    <input
-                      type="number"
-                      value={editPayment.deliveryFee}
-                      onChange={(e) =>
-                        setEditPayment({
-                          ...editPayment,
-                          deliveryFee: e.target.value
-                        })
-                      }
-                      className="w-full p-2 border rounded font-medium outline-none mt-1"
-                    />
-                  </div>
-                )}
               </div>
 
-              {/* Live Summary Breakdown */}
               <div className="border-t pt-3 mb-4 space-y-1.5 text-xs">
                 <div className="flex justify-between text-slate-600">
                   <span>Gross Tests Subtotal:</span>
@@ -613,22 +588,12 @@ export function LabDeskTab({
                   <span>&minus; ₹{liveDiscount}</span>
                 </div>
                 <div className="flex justify-between text-slate-900 font-extrabold text-sm bg-slate-50 p-1.5 rounded border">
-                  <span>Discounted Price (Doctor Ledger Base):</span>
+                  <span>Discounted Price (Doctor Ledger):</span>
                   <span className="text-emerald-700">
                     ₹{liveDiscountedNetPrice}
                   </span>
                 </div>
-                {liveDeliveryFee > 0 && (
-                  <div className="flex justify-between text-slate-600">
-                    <span>Home Visit Fee:</span>
-                    <span>+ ₹{liveDeliveryFee}</span>
-                  </div>
-                )}
-                <div className="flex justify-between font-bold text-slate-800 pt-1">
-                  <span>Total Paid (Cash + UPI):</span>
-                  <span>₹{liveTotalPaid}</span>
-                </div>
-                <div className="flex justify-between font-extrabold text-sm text-red-600">
+                <div className="flex justify-between font-extrabold text-sm text-red-600 pt-1">
                   <span>Updated Balance Due:</span>
                   <span>₹{liveBalanceDue}</span>
                 </div>
@@ -653,13 +618,13 @@ export function LabDeskTab({
         </div>
       )}
 
-      {/* RESULT ENTRY TABLE */}
+      {/* RESULT ENTRY TABLE WITH VISIBLE & EDITABLE REFERENCE RANGES */}
       <table className="w-full text-left text-sm border rounded overflow-hidden mb-6 shadow-sm">
         <thead className="bg-slate-800 text-white border-b">
           <tr>
             <th className="p-3">Test Parameter</th>
-            <th className="p-3">Reference Range</th>
-            <th className="p-3 w-64">Result Value</th>
+            <th className="p-3 w-64">Reference Range &amp; Unit</th>
+            <th className="p-3 w-72">Result Value</th>
             <th className="p-3">Abnormal Flagging</th>
           </tr>
         </thead>
@@ -670,6 +635,16 @@ export function LabDeskTab({
               (results && (results[testKey] || results[t.name])) || {};
             const currentFlag = resObj.flag || "Normal";
 
+            const resolved = resolveTestRefAndUnit(t);
+            const displayRefRange =
+              resObj.customRefRange !== undefined
+                ? resObj.customRefRange
+                : resolved.refRange;
+            const displayUnit =
+              resObj.customUnit !== undefined
+                ? resObj.customUnit
+                : resolved.unit;
+
             let rowClass = "hover:bg-slate-50";
             if (currentFlag === "Critical") rowClass = "bg-red-50";
             else if (currentFlag !== "Normal") rowClass = "bg-amber-50";
@@ -677,27 +652,78 @@ export function LabDeskTab({
             return (
               <tr key={testKey} className={rowClass}>
                 <td className="p-4">
-                  <span className="font-bold text-slate-800 block">
+                  <span className="font-bold text-slate-800 block text-sm">
                     {t.name}
                   </span>
                   {t.parentPackage && (
-                    <span className="text-[10px] font-bold uppercase tracking-wider bg-slate-100 text-slate-500 px-2 py-0.5 rounded border mt-1 inline-block">
+                    <span className="text-[10px] font-bold uppercase tracking-wider bg-blue-50 text-blue-700 px-2 py-0.5 rounded border border-blue-200 mt-1 inline-block">
                       {t.parentPackage}
                     </span>
                   )}
                 </td>
-                <td className="p-4 text-xs font-mono text-slate-600">
-                  {t.refRange || "-"}{" "}
-                  <span className="font-bold">{t.unit || ""}</span>
+
+                {/* VISIBLE & EDITABLE REFERENCE RANGE COLUMN */}
+                <td className="p-4">
+                  <div className="bg-slate-50 border border-slate-200 rounded-lg p-2">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase">
+                        Normal Range
+                      </span>
+                      <span className="text-xs font-extrabold text-emerald-800 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200 font-mono">
+                        {displayRefRange || "-"}{" "}
+                        {displayUnit ? `(${displayUnit})` : ""}
+                      </span>
+                    </div>
+                    <div className="flex gap-1 mt-1">
+                      <input
+                        type="text"
+                        value={displayRefRange}
+                        onChange={(e) => {
+                          const newRange = e.target.value;
+                          const reFlag = evaluateAutoFlag(
+                            resObj.value,
+                            newRange
+                          );
+                          setResults({
+                            ...results,
+                            [testKey]: {
+                              ...resObj,
+                              customRefRange: newRange,
+                              flag: reFlag
+                            }
+                          });
+                        }}
+                        placeholder="Ref Range"
+                        className="w-2/3 px-1.5 py-1 text-[11px] font-mono border rounded bg-white text-slate-700 outline-none focus:border-emerald-500"
+                      />
+                      <input
+                        type="text"
+                        value={displayUnit}
+                        onChange={(e) => {
+                          setResults({
+                            ...results,
+                            [testKey]: {
+                              ...resObj,
+                              customUnit: e.target.value
+                            }
+                          });
+                        }}
+                        placeholder="Unit"
+                        className="w-1/3 px-1.5 py-1 text-[11px] border rounded bg-white text-slate-700 outline-none focus:border-emerald-500"
+                      />
+                    </div>
+                  </div>
                 </td>
+
+                {/* RESULT VALUE INPUT WITH LIVE RANGE PROMPT */}
                 <td className="p-4">
                   <input
                     type="text"
-                    placeholder="Enter Value"
+                    placeholder={`Enter Value (Normal: ${displayRefRange})`}
                     value={resObj.value || ""}
                     onChange={(e) => {
                       const val = e.target.value;
-                      const autoFlag = evaluateAutoFlag(val, t.refRange);
+                      const autoFlag = evaluateAutoFlag(val, displayRefRange);
                       setResults({
                         ...results,
                         [testKey]: {
@@ -707,49 +733,59 @@ export function LabDeskTab({
                         }
                       });
                     }}
-                    className={`w-full p-2 border rounded outline-none font-bold ${
+                    className={`w-full p-2.5 border-2 rounded-lg outline-none font-bold text-sm ${
                       currentFlag === "Critical"
-                        ? "border-red-400 text-red-700 bg-white"
-                        : "focus:border-emerald-500"
+                        ? "border-red-500 text-red-700 bg-white"
+                        : currentFlag !== "Normal"
+                        ? "border-amber-400 text-amber-900 bg-white"
+                        : "border-slate-300 focus:border-emerald-500"
                     }`}
                   />
+                  <span className="block text-[11px] text-slate-500 mt-1 font-mono">
+                    Ref:{" "}
+                    <b className="text-slate-700">{displayRefRange || "-"}</b>{" "}
+                    {displayUnit || ""}
+                  </span>
                 </td>
-                <td className="p-4 flex gap-1">
-                  {["Normal", "Low", "High", "Critical"].map((f) => {
-                    let btnClass =
-                      "bg-white text-slate-500 hover:bg-slate-100";
-                    if (currentFlag === f) {
-                      if (f === "Normal") {
-                        btnClass =
-                          "bg-emerald-500 text-white border-emerald-600";
-                      } else if (f === "Critical") {
-                        btnClass =
-                          "bg-red-600 text-white border-red-700 animate-pulse";
-                      } else {
-                        btnClass =
-                          "bg-amber-500 text-white border-amber-600";
-                      }
-                    }
 
-                    return (
-                      <button
-                        key={f}
-                        onClick={() => {
-                          setResults({
-                            ...results,
-                            [testKey]: {
-                              ...resObj,
-                              value: resObj.value || "",
-                              flag: f
-                            }
-                          });
-                        }}
-                        className={`px-2 py-1.5 text-xs font-bold rounded border transition ${btnClass}`}
-                      >
-                        {f}
-                      </button>
-                    );
-                  })}
+                <td className="p-4">
+                  <div className="flex flex-wrap gap-1">
+                    {["Normal", "Low", "High", "Critical"].map((f) => {
+                      let btnClass =
+                        "bg-white text-slate-500 hover:bg-slate-100";
+                      if (currentFlag === f) {
+                        if (f === "Normal") {
+                          btnClass =
+                            "bg-emerald-500 text-white border-emerald-600";
+                        } else if (f === "Critical") {
+                          btnClass =
+                            "bg-red-600 text-white border-red-700 animate-pulse";
+                        } else {
+                          btnClass =
+                            "bg-amber-500 text-white border-amber-600";
+                        }
+                      }
+
+                      return (
+                        <button
+                          key={f}
+                          onClick={() => {
+                            setResults({
+                              ...results,
+                              [testKey]: {
+                                ...resObj,
+                                value: resObj.value || "",
+                                flag: f
+                              }
+                            });
+                          }}
+                          className={`px-2.5 py-1.5 text-xs font-bold rounded border transition ${btnClass}`}
+                        >
+                          {f}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </td>
               </tr>
             );
@@ -772,6 +808,7 @@ export function LabDeskTab({
         </button>
       </div>
 
+      {/* READ-ONLY PREVIEW MODAL */}
       {showPreviewModal && (
         <div
           onContextMenu={(e) => e.preventDefault()}
@@ -798,7 +835,8 @@ export function LabDeskTab({
 
             <div className="flex-1 overflow-y-auto p-4 md:p-8">
               <div className="bg-white max-w-[760px] mx-auto shadow-lg border border-slate-300 min-h-[1040px] flex flex-col justify-between relative overflow-hidden">
-                <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-[0.035] z-0">
+                {/* CENTER BALAJI LAB LOGO WATERMARK */}
+                <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-[0.06] z-0">
                   <SriBalajiLogoSVG size={310} />
                 </div>
 
@@ -896,6 +934,16 @@ export function LabDeskTab({
                           value: "-",
                           flag: "Normal"
                         };
+                        const resolved = resolveTestRefAndUnit(t);
+                        const finalRange =
+                          res.customRefRange !== undefined
+                            ? res.customRefRange
+                            : resolved.refRange;
+                        const finalUnit =
+                          res.customUnit !== undefined
+                            ? res.customUnit
+                            : resolved.unit;
+
                         const isAbnormal =
                           res.flag === "High" ||
                           res.flag === "Low" ||
@@ -930,10 +978,10 @@ export function LabDeskTab({
                               {res.flag === "Normal" ? "" : res.flag}
                             </td>
                             <td className="p-2 border border-slate-200 font-mono text-slate-600">
-                              {t.refRange || "-"}
+                              {finalRange || "-"}
                             </td>
                             <td className="p-2 border border-slate-200 text-slate-600">
-                              {t.unit || ""}
+                              {finalUnit || "-"}
                             </td>
                           </tr>
                         );
@@ -942,6 +990,7 @@ export function LabDeskTab({
                   </table>
                 </div>
 
+                {/* SLIM SIGNATURE & FOOTER */}
                 <div className="relative z-10">
                   <div className="px-12 pb-6 flex justify-end">
                     <div className="text-center">
