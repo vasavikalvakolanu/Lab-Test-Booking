@@ -2,6 +2,177 @@ import React, { useState } from "react";
 import jsPDF from "jspdf";
 import "jspdf-autotable";
 
+// =========================================================
+// BUILT-IN CLINICAL REFERENCE RANGE DICTIONARY
+// Automatically populates ranges & units if missing in DB
+// =========================================================
+const STANDARD_CLINICAL_RANGES = {
+  // Complete Urine Analysis
+  albumin: { refRange: "Nil / Absent", unit: "" },
+  "urine albumin": { refRange: "Nil / Absent", unit: "" },
+  "sugar (fasting)": { refRange: "Nil (70 - 100)", unit: "mg/dL" },
+  "sugar (p.p.)": { refRange: "Nil (< 140)", unit: "mg/dL" },
+  "sugar random": { refRange: "70 - 140", unit: "mg/dL" },
+  "urine sugar": { refRange: "Nil / Absent", unit: "" },
+  "urine sugar random": { refRange: "Nil / Absent", unit: "" },
+  "bile salts": { refRange: "Absent (Negative)", unit: "" },
+  "bile pigments": { refRange: "Absent (Negative)", unit: "" },
+  urobilinogen: { refRange: "Normal (0.2 - 1.0)", unit: "mg/dL" },
+  "occult blood": { refRange: "Negative (Absent)", unit: "" },
+  "pregnancy test": { refRange: "Negative", unit: "" },
+  "urine pregnancy test": { refRange: "Negative", unit: "" },
+  "microscopic exam": { refRange: "WBC: 0-5/hpf, RBC: Nil", unit: "/hpf" },
+  "urine microscopy": { refRange: "WBC: 0-5/hpf, RBC: Nil", unit: "/hpf" },
+  "pus cells": { refRange: "0 - 5", unit: "/hpf" },
+  "epithelial cells": { refRange: "Few (1 - 4)", unit: "/hpf" },
+  "ketone bodies": { refRange: "Absent (Negative)", unit: "" },
+  "specific gravity": { refRange: "1.005 - 1.030", unit: "" },
+  ph: { refRange: "4.5 - 8.0", unit: "" },
+
+  // Diabetes & Blood Sugar
+  "fasting blood sugar": { refRange: "70 - 100", unit: "mg/dL" },
+  "fasting blood sugar (fbs)": { refRange: "70 - 100", unit: "mg/dL" },
+  fbs: { refRange: "70 - 100", unit: "mg/dL" },
+  "post prandial blood sugar": { refRange: "70 - 140", unit: "mg/dL" },
+  "post prandial blood sugar (ppbs)": { refRange: "70 - 140", unit: "mg/dL" },
+  ppbs: { refRange: "70 - 140", unit: "mg/dL" },
+  "random blood sugar": { refRange: "70 - 140", unit: "mg/dL" },
+  "random blood sugar (rbs)": { refRange: "70 - 140", unit: "mg/dL" },
+  rbs: { refRange: "70 - 140", unit: "mg/dL" },
+  hba1c: { refRange: "4.0 - 5.6", unit: "%" },
+  "hba1c (glycosylated haemoglobin)": { refRange: "4.0 - 5.6", unit: "%" },
+
+  // Lipid Profile
+  "total cholesterol": { refRange: "< 200", unit: "mg/dL" },
+  triglycerides: { refRange: "< 150", unit: "mg/dL" },
+  "hdl cholesterol": { refRange: "40 - 60", unit: "mg/dL" },
+  "h.d.l.": { refRange: "40 - 60", unit: "mg/dL" },
+  "ldl cholesterol": { refRange: "< 100", unit: "mg/dL" },
+  "l.d.l.": { refRange: "80 - 130", unit: "mg/dL" },
+  "vldl cholesterol": { refRange: "5 - 40", unit: "mg/dL" },
+  "v.l.d.l.": { refRange: "5 - 40", unit: "mg/dL" },
+
+  // Complete Blood Count (CBC) & Hematology
+  haemoglobin: { refRange: "13.0 - 17.0", unit: "g/dL" },
+  "haemoglobin (hb)": { refRange: "13.0 - 17.0", unit: "g/dL" },
+  hemoglobin: { refRange: "13.0 - 17.0", unit: "g/dL" },
+  "total rbc count": { refRange: "4.5 - 5.5", unit: "mill/cumm" },
+  "rbc count": { refRange: "4.5 - 5.5", unit: "mill/cumm" },
+  "total wbc count": { refRange: "4000 - 11000", unit: "/cumm" },
+  "wbc count": { refRange: "4000 - 11000", unit: "/cumm" },
+  "platelet count": { refRange: "1.5 - 4.5", unit: "Lakhs/cumm" },
+  platelets: { refRange: "1.5 - 4.5", unit: "Lakhs/cumm" },
+  pcv: { refRange: "40 - 50", unit: "%" },
+  "packed cell volume (pcv)": { refRange: "40 - 50", unit: "%" },
+  mcv: { refRange: "80 - 100", unit: "fL" },
+  mch: { refRange: "27 - 32", unit: "pg" },
+  mchc: { refRange: "32 - 36", unit: "g/dL" },
+  neutrophils: { refRange: "40 - 75", unit: "%" },
+  lymphocytes: { refRange: "20 - 40", unit: "%" },
+  eosinophils: { refRange: "1 - 6", unit: "%" },
+  monocytes: { refRange: "2 - 10", unit: "%" },
+  basophils: { refRange: "0 - 1", unit: "%" },
+  esr: { refRange: "0 - 20", unit: "mm/hr" },
+  "esr (erythrocyte sedimentation rate)": { refRange: "0 - 20", unit: "mm/hr" },
+
+  // Liver Function Test (LFT)
+  "total bilirubin": { refRange: "0.2 - 1.2", unit: "mg/dL" },
+  "direct bilirubin": { refRange: "0.0 - 0.3", unit: "mg/dL" },
+  "indirect bilirubin": { refRange: "0.2 - 0.9", unit: "mg/dL" },
+  "sgpt (alt)": { refRange: "7 - 56", unit: "U/L" },
+  sgpt: { refRange: "7 - 56", unit: "U/L" },
+  "sgot (ast)": { refRange: "8 - 48", unit: "U/L" },
+  sgot: { refRange: "8 - 48", unit: "U/L" },
+  "alkaline phosphatase": { refRange: "44 - 147", unit: "U/L" },
+  "total protein": { refRange: "6.0 - 8.3", unit: "g/dL" },
+  "serum albumin": { refRange: "3.5 - 5.0", unit: "g/dL" },
+  globulin: { refRange: "2.0 - 3.5", unit: "g/dL" },
+  "a/g ratio": { refRange: "1.0 - 2.1", unit: "" },
+
+  // Renal / Kidney Function Test (RFT)
+  "blood urea": { refRange: "15 - 40", unit: "mg/dL" },
+  urea: { refRange: "15 - 40", unit: "mg/dL" },
+  "serum creatinine": { refRange: "0.6 - 1.2", unit: "mg/dL" },
+  creatinine: { refRange: "0.6 - 1.2", unit: "mg/dL" },
+  "uric acid": { refRange: "3.5 - 7.2", unit: "mg/dL" },
+  "serum calcium": { refRange: "8.5 - 10.2", unit: "mg/dL" },
+  calcium: { refRange: "8.5 - 10.2", unit: "mg/dL" },
+  sodium: { refRange: "135 - 145", unit: "mEq/L" },
+  potassium: { refRange: "3.5 - 5.1", unit: "mEq/L" },
+  chloride: { refRange: "96 - 106", unit: "mEq/L" },
+
+  // Thyroid Profile
+  t3: { refRange: "80 - 200", unit: "ng/dL" },
+  "t3 (triiodothyronine)": { refRange: "80 - 200", unit: "ng/dL" },
+  t4: { refRange: "5.1 - 14.1", unit: "ug/dL" },
+  "t4 (thyroxine)": { refRange: "5.1 - 14.1", unit: "ug/dL" },
+  tsh: { refRange: "0.4 - 4.5", unit: "uIU/mL" },
+  "tsh (ultra sensitive)": { refRange: "0.4 - 4.5", unit: "uIU/mL" },
+
+  // Serology / Fever Profile
+  "dengue n.s.1": { refRange: "Negative", unit: "" },
+  "dengue ns1": { refRange: "Negative", unit: "" },
+  "dengue igg": { refRange: "Negative", unit: "" },
+  "dengue igm": { refRange: "Negative", unit: "" },
+  "malaria parasite": { refRange: "Not Detected", unit: "" },
+  "widal test": { refRange: "< 1:80 (Non-Reactive)", unit: "Titre" },
+  crp: { refRange: "< 6.0", unit: "mg/L" },
+  "c-reactive protein (crp)": { refRange: "< 6.0", unit: "mg/L" }
+};
+
+export const resolveTestRefAndUnit = (testObj, catalogMatch = null) => {
+  if (!testObj) return { refRange: "-", unit: "" };
+
+  const rawRange =
+    testObj.refRange ||
+    testObj.normalRange ||
+    testObj.referenceRange ||
+    testObj.range ||
+    (catalogMatch &&
+      (catalogMatch.refRange ||
+        catalogMatch.normalRange ||
+        catalogMatch.referenceRange ||
+        catalogMatch.range)) ||
+    "";
+
+  const rawUnit =
+    testObj.unit ||
+    testObj.units ||
+    (catalogMatch && (catalogMatch.unit || catalogMatch.units)) ||
+    "";
+
+  const cleanRange = String(rawRange).trim();
+  const cleanUnit = String(rawUnit).trim();
+
+  if (cleanRange && cleanRange !== "-") {
+    return {
+      refRange: cleanRange,
+      unit: cleanUnit === "-" ? "" : cleanUnit
+    };
+  }
+
+  // Lookup in built-in clinical dictionary if missing or "-" in database
+  const nameKey = String(testObj.name || "")
+    .trim()
+    .toLowerCase();
+  const strippedKey = nameKey.replace(/\s*\(.*?\)\s*/g, "").trim();
+
+  const dictHit =
+    STANDARD_CLINICAL_RANGES[nameKey] || STANDARD_CLINICAL_RANGES[strippedKey];
+
+  if (dictHit) {
+    return {
+      refRange: dictHit.refRange,
+      unit: cleanUnit && cleanUnit !== "-" ? cleanUnit : dictHit.unit
+    };
+  }
+
+  return {
+    refRange: cleanRange || "-",
+    unit: cleanUnit === "-" ? "" : cleanUnit
+  };
+};
+
 const FALLBACK_CREST_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" width="400" height="400">
   <circle cx="200" cy="200" r="186" fill="#ffffff" stroke="#0f2d4a" stroke-width="14" />
   <circle cx="200" cy="200" r="156" fill="#ffffff" stroke="#c59b46" stroke-width="5" />
@@ -22,21 +193,37 @@ let logoWatermarkDataUrl = null;
 let fallbackCrestDataUrl = null;
 let fallbackWatermarkDataUrl = null;
 
-const convertCrestToDataUrl = (img, alpha = 1.0, targetSize = 600) => {
+// Flattens watermark onto pure #ffffff white background so jsPDF renders zero alpha-channel artifacts
+const convertCrestToDataUrl = (
+  img,
+  alpha = 1.0,
+  targetSize = 600,
+  flattenOnWhite = false
+) => {
   try {
     const canvas = document.createElement("canvas");
     canvas.width = targetSize;
     canvas.height = targetSize;
     const ctx = canvas.getContext("2d");
+
+    if (flattenOnWhite) {
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(0, 0, targetSize, targetSize);
+    }
+
     ctx.globalAlpha = alpha;
 
     const w = img.naturalWidth;
     const h = img.naturalHeight;
+    // Center crop if image isn't a 1:1 square
     const sourceSize = w > h * 1.35 ? h : Math.min(w, h);
+    const sx = w > h * 1.35 ? 0 : Math.max(0, (w - sourceSize) / 2);
+    const sy = Math.max(0, (h - sourceSize) / 2);
+
     ctx.drawImage(
       img,
-      0,
-      0,
+      sx,
+      sy,
       sourceSize,
       sourceSize,
       0,
@@ -55,8 +242,9 @@ if (typeof window !== "undefined") {
   lgImg.crossOrigin = "Anonymous";
   lgImg.onload = () => {
     if (lgImg.naturalWidth > 40) {
-      logoDataUrl = convertCrestToDataUrl(lgImg, 1.0, 600);
-      logoWatermarkDataUrl = convertCrestToDataUrl(lgImg, 0.03, 700);
+      logoDataUrl = convertCrestToDataUrl(lgImg, 1.0, 600, false);
+      // Flattened onto white at 6.5% opacity for a crisp, clean center PDF watermark
+      logoWatermarkDataUrl = convertCrestToDataUrl(lgImg, 0.065, 700, true);
     }
   };
   lgImg.src = "/logo.png";
@@ -67,16 +255,13 @@ if (typeof window !== "undefined") {
   });
   const svgUrl = URL.createObjectURL(svgBlob);
   svgImg.onload = () => {
-    fallbackCrestDataUrl = convertCrestToDataUrl(svgImg, 1.0, 480);
-    fallbackWatermarkDataUrl = convertCrestToDataUrl(svgImg, 0.03, 600);
+    fallbackCrestDataUrl = convertCrestToDataUrl(svgImg, 1.0, 480, false);
+    fallbackWatermarkDataUrl = convertCrestToDataUrl(svgImg, 0.065, 600, true);
     URL.revokeObjectURL(svgUrl);
   };
   svgImg.src = svgUrl;
 }
 
-// =========================================================
-// REACT COMPONENT EXPORT (FIXES BUILD ERROR)
-// =========================================================
 export function SriBalajiLogoSVG({ size = 80, width, className = "" }) {
   const [imgFailed, setImgFailed] = useState(false);
   const finalSize = width || size;
@@ -107,9 +292,6 @@ export function SriBalajiLogoSVG({ size = 80, width, className = "" }) {
   );
 }
 
-// =========================================================
-// DIRECT IN-PORTAL PRINT ENGINE (NO DOWNLOAD REQUIRED)
-// =========================================================
 const triggerDirectBrowserPrint = (docPdf) => {
   try {
     docPdf.autoPrint();
@@ -150,34 +332,41 @@ const triggerDirectBrowserPrint = (docPdf) => {
   }
 };
 
+// =========================================================
+// 1. HEADER & CENTER WATERMARK DRAWER (DRAWN BEFORE TABLE)
+// =========================================================
 export const drawSriBalajiLetterhead = (docPdf, useLetterhead = true) => {
   if (!useLetterhead) return;
 
   const activeCrest = logoDataUrl || fallbackCrestDataUrl;
   const activeWatermark = logoWatermarkDataUrl || fallbackWatermarkDataUrl;
 
+  // Centered Balaji Lab Logo Watermark right in the middle of the page (x=63, y=92, 84x84mm)
   if (activeWatermark) {
     try {
-      docPdf.addImage(activeWatermark, "PNG", 66, 112, 78, 78);
+      docPdf.addImage(activeWatermark, "PNG", 63, 92, 84, 84);
     } catch (e) {}
   }
 
+  // Top Header Circular Logo (22mm x 22mm)
   if (activeCrest) {
     try {
-      docPdf.addImage(activeCrest, "PNG", 50, 7, 21, 21);
+      docPdf.addImage(activeCrest, "PNG", 49, 6.5, 22, 22);
     } catch (e) {}
   }
 
+  // Header Title
   docPdf.setFont("times", "bold");
-  docPdf.setFontSize(21);
+  docPdf.setFontSize(22);
   docPdf.setTextColor(15, 45, 74);
   docPdf.text("SRI BALAJI", 74, 16.5);
 
   docPdf.setFont("helvetica", "bold");
-  docPdf.setFontSize(9.8);
+  docPdf.setFontSize(10);
   docPdf.setTextColor(13, 92, 133);
   docPdf.text("CLINICAL LABORATORY", 74.5, 22.5);
 
+  // Ornamental Divider with Gold Center Diamond
   docPdf.setDrawColor(15, 45, 74);
   docPdf.setLineWidth(0.35);
   docPdf.line(14, 30.5, 102.5, 30.5);
@@ -192,6 +381,7 @@ export const drawSriBalajiLetterhead = (docPdf, useLetterhead = true) => {
   docPdf.triangle(103.2, 30.8, 105, 29.6, 105, 32.0, "F");
   docPdf.triangle(106.8, 30.8, 105, 29.6, 105, 32.0, "F");
 
+  // Contact Info Line
   docPdf.setFont("helvetica", "normal");
   docPdf.setFontSize(7.8);
   docPdf.setTextColor(15, 45, 74);
@@ -201,23 +391,56 @@ export const drawSriBalajiLetterhead = (docPdf, useLetterhead = true) => {
     35.2,
     { align: "center" }
   );
+};
 
+// =========================================================
+// 2. DEDICATED BOTTOM FOOTER DRAWER (STAMPED ON ALL PAGES)
+// Matches the Preview Window footer 100% and never clips!
+// =========================================================
+export const drawSriBalajiFooter = (
+  docPdf,
+  useLetterhead = true,
+  includeSignature = true
+) => {
+  if (includeSignature) {
+    const sigY = 268;
+    docPdf.setDrawColor(15, 45, 74);
+    docPdf.setLineWidth(0.35);
+    docPdf.line(140, sigY, 194, sigY);
+
+    docPdf.setFont("helvetica", "bold");
+    docPdf.setFontSize(9);
+    docPdf.setTextColor(15, 45, 74);
+    docPdf.text("Authorized Signatory", 167, sigY + 4.5, { align: "center" });
+
+    docPdf.setFont("helvetica", "normal");
+    docPdf.setFontSize(7.5);
+    docPdf.setTextColor(100, 116, 139);
+    docPdf.text("Sri Balaji Clinical Laboratory", 167, sigY + 8.5, {
+      align: "center"
+    });
+  }
+
+  if (!useLetterhead) return;
+
+  // Side Navy Lines + TRUST • ACCURACY • CARE (y = 283.5mm)
   docPdf.setDrawColor(15, 45, 74);
   docPdf.setLineWidth(0.45);
-  docPdf.line(14, 290.5, 68, 290.5);
-  docPdf.line(142, 290.5, 196, 290.5);
+  docPdf.line(14, 283.5, 68, 283.5);
+  docPdf.line(142, 283.5, 196, 283.5);
 
   docPdf.setFont("helvetica", "bold");
-  docPdf.setFontSize(7.5);
+  docPdf.setFontSize(8);
   docPdf.setTextColor(15, 45, 74);
-  docPdf.text("TRUST   •   ACCURACY   •   CARE", 105, 291.3, {
+  docPdf.text("TRUST   •   ACCURACY   •   CARE", 105, 284.4, {
     align: "center"
   });
 
+  // Slim Gold & Navy Bottom Stripes (y = 287.5mm - 291mm, safe inside all PDF viewers)
   docPdf.setFillColor(197, 155, 70);
-  docPdf.rect(0, 294.2, 210, 0.8, "F");
+  docPdf.rect(14, 287.2, 182, 0.9, "F");
   docPdf.setFillColor(15, 45, 74);
-  docPdf.rect(0, 295.0, 210, 2.0, "F");
+  docPdf.rect(14, 288.1, 182, 2.2, "F");
 };
 
 export const getTestKey = (t, idx) => {
@@ -230,7 +453,22 @@ export const evaluateAutoFlag = (rawValue, refRange) => {
   if (rawValue === "" || rawValue === null || rawValue === undefined) {
     return "Normal";
   }
-  const numVal = parseFloat(String(rawValue).replace(/,/g, "").trim());
+  const strVal = String(rawValue).trim();
+
+  // Flag qualitative positive markers like (+), (++), (+++), Positive, Reactive
+  if (
+    strVal.includes("+") ||
+    /^(positive|reactive|present|detected)$/i.test(strVal)
+  ) {
+    if (
+      refRange &&
+      /nil|absent|negative|normal|non-reactive/i.test(String(refRange))
+    ) {
+      return strVal.includes("+++") ? "Critical" : "High";
+    }
+  }
+
+  const numVal = parseFloat(strVal.replace(/,/g, ""));
   if (isNaN(numVal) || !refRange) return "Normal";
 
   const cleanRange = String(refRange).replace(/,/g, "").trim();
@@ -250,7 +488,7 @@ export const evaluateAutoFlag = (rawValue, refRange) => {
     return "Normal";
   }
 
-  const lessMatch = cleanRange.match(/<\s*=?\s*(\d+(?:\.\d+)?)/);
+  const lessMatch = cleanRange.match(/(?:<|up\s*to)\s*=?\s*(\d+(?:\.\d+)?)/i);
   if (lessMatch) {
     const max = parseFloat(lessMatch[1]);
     if (numVal > max) {
@@ -285,9 +523,12 @@ export const buildCatalogMaps = (categories, packages) => {
     const tests = c.tests || [];
     tests.forEach((t) => {
       if (t && t.name) {
+        const resolved = resolveTestRefAndUnit(t);
         const itemObj = {
           ...t,
           id: t.id ? String(t.id) : t.name.trim(),
+          refRange: resolved.refRange,
+          unit: resolved.unit,
           category: groupTitle,
           isPinned: Boolean(t.isPinned || c.isPinned),
           isPackage: false
@@ -302,9 +543,12 @@ export const buildCatalogMaps = (categories, packages) => {
     const tests = p.tests || [];
     tests.forEach((t) => {
       if (t && t.name && !testMap.has(t.name.trim().toLowerCase())) {
+        const resolved = resolveTestRefAndUnit(t);
         testMap.set(t.name.trim().toLowerCase(), {
           ...t,
           id: t.id ? String(t.id) : t.name.trim(),
+          refRange: resolved.refRange,
+          unit: resolved.unit,
           isPackage: false
         });
       }
@@ -389,15 +633,16 @@ export const expandToIndividualTests = (
     const catalogMatch = testMap
       ? testMap.get(rawName.toLowerCase()) || testMap.get(cleanNameLower)
       : null;
+
+    const resolved = resolveTestRefAndUnit(item, catalogMatch);
     const uniqueKey = item.id ? String(item.id) : rawName;
 
     expanded.push({
       ...item,
       id: uniqueKey,
       name: rawName,
-      refRange:
-        item.refRange || (catalogMatch ? catalogMatch.refRange : "") || "-",
-      unit: item.unit || (catalogMatch ? catalogMatch.unit : "") || "",
+      refRange: resolved.refRange,
+      unit: resolved.unit,
       parentPackage: item.parentPackage || parentPkgName || ""
     });
   };
@@ -420,12 +665,17 @@ export const expandToIndividualTests = (
 // ==========================================
 // INTERNAL BUILDERS FOR REPORT & BILL PDF
 // ==========================================
-const buildReportPdfDocument = (patient, tests, results, useLetterhead = true) => {
+const buildReportPdfDocument = (
+  patient,
+  tests,
+  results,
+  useLetterhead = true
+) => {
   const docPdf = new jsPDF();
 
   drawSriBalajiLetterhead(docPdf, useLetterhead);
 
-  const startY = useLetterhead ? 43 : 20;
+  const startY = useLetterhead ? 42 : 20;
 
   docPdf.setDrawColor(203, 213, 225);
   docPdf.setLineWidth(0.3);
@@ -447,7 +697,11 @@ const buildReportPdfDocument = (patient, tests, results, useLetterhead = true) =
     startY + 11.5
   );
 
-  docPdf.text(`Clinical ID : ${patient.clinicalId || "N/A"}`, 120, startY + 0.5);
+  docPdf.text(
+    `Clinical ID : ${patient.clinicalId || "N/A"}`,
+    120,
+    startY + 0.5
+  );
   docPdf.text(`Report Date : ${patient.date || "N/A"}`, 120, startY + 6);
   docPdf.text(
     `Ref. By Dr. : ${patient.doctorName || "Self Walk-in"}`,
@@ -473,6 +727,10 @@ const buildReportPdfDocument = (patient, tests, results, useLetterhead = true) =
       value: "-",
       flag: "Normal"
     };
+    const resolved = resolveTestRefAndUnit(t);
+    const finalRange = res.customRefRange || resolved.refRange || "-";
+    const finalUnit = res.customUnit !== undefined ? res.customUnit : resolved.unit;
+
     tableRows.push({
       isHeader: false,
       flag: res.flag || "Normal",
@@ -480,15 +738,15 @@ const buildReportPdfDocument = (patient, tests, results, useLetterhead = true) =
         t.name,
         res.value || "-",
         res.flag === "Normal" ? "" : res.flag,
-        t.refRange || "-",
-        t.unit || ""
+        finalRange,
+        finalUnit || "-"
       ]
     });
   });
 
   docPdf.autoTable({
     startY: startY + 18,
-    margin: { top: 43, bottom: 20, left: 14, right: 14 },
+    margin: { top: 42, bottom: 32, left: 14, right: 14 },
     head: [
       ["Test Description", "Result Value", "Flag", "Reference Range", "Unit"]
     ],
@@ -500,7 +758,8 @@ const buildReportPdfDocument = (patient, tests, results, useLetterhead = true) =
       textColor: [15, 23, 42],
       lineColor: [203, 213, 225],
       lineWidth: 0.2,
-      fontSize: 9
+      fontSize: 8.8,
+      cellPadding: 2.2
     },
     willDrawPage: function (data) {
       if (data.pageNumber > 1 && useLetterhead) {
@@ -531,16 +790,12 @@ const buildReportPdfDocument = (patient, tests, results, useLetterhead = true) =
     }
   });
 
-  const finalY = Math.min(docPdf.lastAutoTable.finalY + 18, 272);
-  docPdf.setFont("helvetica", "bold");
-  docPdf.setFontSize(9);
-  docPdf.setTextColor(15, 45, 74);
-  docPdf.text("_________________________", 142, finalY);
-  docPdf.text("Authorized Signatory", 148, finalY + 4.5);
-  docPdf.setFont("helvetica", "normal");
-  docPdf.setFontSize(7.5);
-  docPdf.setTextColor(100, 116, 139);
-  docPdf.text("Sri Balaji Clinical Laboratory", 146, finalY + 8.5);
+  // Stamp Signature & Bottom Footer across all pages so it is NEVER missing
+  const totalPages = docPdf.internal.getNumberOfPages();
+  for (let i = 1; i <= totalPages; i++) {
+    docPdf.setPage(i);
+    drawSriBalajiFooter(docPdf, useLetterhead, i === totalPages);
+  }
 
   return docPdf;
 };
@@ -553,33 +808,33 @@ const buildBillPdfDocument = (booking) => {
   docPdf.setFont("helvetica", "bold");
   docPdf.setFontSize(11);
   docPdf.setTextColor(15, 45, 74);
-  docPdf.text("PATIENT BILL / PAYMENT RECEIPT", 105, 43, { align: "center" });
+  docPdf.text("PATIENT BILL / PAYMENT RECEIPT", 105, 42, { align: "center" });
 
   docPdf.setDrawColor(203, 213, 225);
   docPdf.setLineWidth(0.3);
-  docPdf.roundedRect(14, 46, 182, 18.5, 2, 2, "S");
+  docPdf.roundedRect(14, 45, 182, 18.5, 2, 2, "S");
 
   docPdf.setFont("helvetica", "bold");
   docPdf.setFontSize(9);
   docPdf.setTextColor(15, 45, 74);
-  docPdf.text(`Patient Name : ${booking.name || "N/A"}`, 18, 51);
+  docPdf.text(`Patient Name : ${booking.name || "N/A"}`, 18, 50);
   docPdf.text(
     `Age / Gender : ${booking.age || "N/A"} Yrs / ${booking.gender || "N/A"}`,
     18,
-    56.5
+    55.5
   );
-  docPdf.text(`Phone        : ${booking.phone || "N/A"}`, 18, 62);
+  docPdf.text(`Phone        : ${booking.phone || "N/A"}`, 18, 61);
 
   docPdf.text(
     `Receipt / ID : ${booking.clinicalId || booking.bookingRef || "N/A"}`,
     120,
-    51
+    50
   );
-  docPdf.text(`Date         : ${booking.date || "N/A"}`, 120, 56.5);
+  docPdf.text(`Date         : ${booking.date || "N/A"}`, 120, 55.5);
   docPdf.text(
     `Collection   : ${booking.collectionType === "home" ? "Home Visit" : "Lab Visit"}`,
     120,
-    62
+    61
   );
 
   const items =
@@ -594,8 +849,8 @@ const buildBillPdfDocument = (booking) => {
   ]);
 
   docPdf.autoTable({
-    startY: 68,
-    margin: { top: 43, bottom: 20, left: 14, right: 14 },
+    startY: 67,
+    margin: { top: 42, bottom: 32, left: 14, right: 14 },
     head: [["#", "Test / Health Package Description", "Amount"]],
     body: bodyData,
     theme: "grid",
@@ -621,7 +876,7 @@ const buildBillPdfDocument = (booking) => {
     ["Subtotal", `Rs. ${booking.subtotal || grandTotal}`]
   ];
   if (Number(booking.discount || 0) > 0) {
-    summaryRows.push(["Promo Discount", `- Rs. ${booking.discount}`]);
+    summaryRows.push(["Discount", `- Rs. ${booking.discount}`]);
   }
   if (Number(booking.deliveryFee || 0) > 0) {
     summaryRows.push(["Home Visit Fee", `+ Rs. ${booking.deliveryFee}`]);
@@ -635,7 +890,7 @@ const buildBillPdfDocument = (booking) => {
 
   docPdf.autoTable({
     startY: docPdf.lastAutoTable.finalY + 5,
-    margin: { left: 110, right: 14, bottom: 20 },
+    margin: { left: 110, right: 14, bottom: 32 },
     body: summaryRows,
     theme: "plain",
     styles: {
@@ -658,12 +913,15 @@ const buildBillPdfDocument = (booking) => {
     }
   });
 
+  const totalPages = docPdf.internal.getNumberOfPages();
+  for (let i = 1; i <= totalPages; i++) {
+    docPdf.setPage(i);
+    drawSriBalajiFooter(docPdf, true, i === totalPages);
+  }
+
   return docPdf;
 };
 
-// ==========================================
-// EXPORTED PRINT & DOWNLOAD FUNCTIONS
-// ==========================================
 export const printPDFDirectly = (
   patient,
   tests,
