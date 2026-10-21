@@ -4,7 +4,6 @@ import "jspdf-autotable";
 
 // =========================================================
 // BUILT-IN CLINICAL REFERENCE RANGE DICTIONARY
-// Automatically populates ranges & units if missing in DB
 // =========================================================
 const STANDARD_CLINICAL_RANGES = {
   // Complete Urine Analysis
@@ -151,7 +150,6 @@ export const resolveTestRefAndUnit = (testObj, catalogMatch = null) => {
     };
   }
 
-  // Lookup in built-in clinical dictionary if missing or "-" in database
   const nameKey = String(testObj.name || "")
     .trim()
     .toLowerCase();
@@ -193,7 +191,7 @@ let logoWatermarkDataUrl = null;
 let fallbackCrestDataUrl = null;
 let fallbackWatermarkDataUrl = null;
 
-// Flattens watermark onto pure #ffffff white background so jsPDF renders zero alpha-channel artifacts
+// Preserves exact aspect ratio centered inside a square canvas
 const convertCrestToDataUrl = (
   img,
   alpha = 1.0,
@@ -213,24 +211,15 @@ const convertCrestToDataUrl = (
 
     ctx.globalAlpha = alpha;
 
-    const w = img.naturalWidth;
-    const h = img.naturalHeight;
-    // Center crop if image isn't a 1:1 square
-    const sourceSize = w > h * 1.35 ? h : Math.min(w, h);
-    const sx = w > h * 1.35 ? 0 : Math.max(0, (w - sourceSize) / 2);
-    const sy = Math.max(0, (h - sourceSize) / 2);
+    const w = img.naturalWidth || 400;
+    const h = img.naturalHeight || 400;
+    const scale = Math.min(targetSize / w, targetSize / h);
+    const drawW = w * scale;
+    const drawH = h * scale;
+    const dx = (targetSize - drawW) / 2;
+    const dy = (targetSize - drawH) / 2;
 
-    ctx.drawImage(
-      img,
-      sx,
-      sy,
-      sourceSize,
-      sourceSize,
-      0,
-      0,
-      targetSize,
-      targetSize
-    );
+    ctx.drawImage(img, 0, 0, w, h, dx, dy, drawW, drawH);
     return canvas.toDataURL("image/png");
   } catch (e) {
     return null;
@@ -243,8 +232,8 @@ if (typeof window !== "undefined") {
   lgImg.onload = () => {
     if (lgImg.naturalWidth > 40) {
       logoDataUrl = convertCrestToDataUrl(lgImg, 1.0, 600, false);
-      // Flattened onto white at 6.5% opacity for a crisp, clean center PDF watermark
-      logoWatermarkDataUrl = convertCrestToDataUrl(lgImg, 0.065, 700, true);
+      // Clean 5% opacity watermark flattened on white for dead-center placement
+      logoWatermarkDataUrl = convertCrestToDataUrl(lgImg, 0.05, 700, true);
     }
   };
   lgImg.src = "/logo.png";
@@ -256,7 +245,7 @@ if (typeof window !== "undefined") {
   const svgUrl = URL.createObjectURL(svgBlob);
   svgImg.onload = () => {
     fallbackCrestDataUrl = convertCrestToDataUrl(svgImg, 1.0, 480, false);
-    fallbackWatermarkDataUrl = convertCrestToDataUrl(svgImg, 0.065, 600, true);
+    fallbackWatermarkDataUrl = convertCrestToDataUrl(svgImg, 0.05, 600, true);
     URL.revokeObjectURL(svgUrl);
   };
   svgImg.src = svgUrl;
@@ -308,8 +297,9 @@ const triggerDirectBrowserPrint = (docPdf) => {
     printFrame.style.position = "fixed";
     printFrame.style.right = "0";
     printFrame.style.bottom = "0";
-    printFrame.style.width = "0";
-    printFrame.style.height = "0";
+    printFrame.style.width = "1px";
+    printFrame.style.height = "1px";
+    printFrame.style.opacity = "0";
     printFrame.style.border = "0";
     printFrame.src = blobUrl;
 
@@ -321,7 +311,7 @@ const triggerDirectBrowserPrint = (docPdf) => {
         } catch (err) {
           window.open(blobUrl, "_blank");
         }
-      }, 250);
+      }, 400);
     };
 
     document.body.appendChild(printFrame);
@@ -333,7 +323,7 @@ const triggerDirectBrowserPrint = (docPdf) => {
 };
 
 // =========================================================
-// 1. HEADER & CENTER WATERMARK DRAWER (DRAWN BEFORE TABLE)
+// 1. MATHEMATICALLY CENTERED HEADER & MIDDLE WATERMARK
 // =========================================================
 export const drawSriBalajiLetterhead = (docPdf, useLetterhead = true) => {
   if (!useLetterhead) return;
@@ -341,61 +331,92 @@ export const drawSriBalajiLetterhead = (docPdf, useLetterhead = true) => {
   const activeCrest = logoDataUrl || fallbackCrestDataUrl;
   const activeWatermark = logoWatermarkDataUrl || fallbackWatermarkDataUrl;
 
-  // Centered Balaji Lab Logo Watermark right in the middle of the page (x=63, y=92, 84x84mm)
+  // A. Exact Middle-of-Page Watermark (Centered at X=105mm, Y=148mm, Size=78x78mm)
   if (activeWatermark) {
     try {
-      docPdf.addImage(activeWatermark, "PNG", 63, 92, 84, 84);
+      const wmSize = 78;
+      const wmX = (210 - wmSize) / 2; // 66mm
+      const wmY = (297 - wmSize) / 2; // 109.5mm (Dead center of A4)
+      docPdf.addImage(activeWatermark, "PNG", wmX, wmY, wmSize, wmSize);
     } catch (e) {}
   }
 
-  // Top Header Circular Logo (22mm x 22mm)
-  if (activeCrest) {
-    try {
-      docPdf.addImage(activeCrest, "PNG", 49, 6.5, 22, 22);
-    } catch (e) {}
-  }
+  // B. Dynamically Centered Top Header [Circular Logo + SRI BALAJI / CLINICAL LABORATORY]
+  const logoSize = 22;
+  const gap = 3.5;
 
-  // Header Title
   docPdf.setFont("times", "bold");
-  docPdf.setFontSize(22);
-  docPdf.setTextColor(15, 45, 74);
-  docPdf.text("SRI BALAJI", 74, 16.5);
+  docPdf.setFontSize(24);
+  const titleStr = "SRI BALAJI";
+  const titleWidth = docPdf.getTextWidth(titleStr);
 
   docPdf.setFont("helvetica", "bold");
-  docPdf.setFontSize(10);
-  docPdf.setTextColor(13, 92, 133);
-  docPdf.text("CLINICAL LABORATORY", 74.5, 22.5);
+  docPdf.setFontSize(10.2);
+  const subStr = "CLINICAL LABORATORY";
+  const subWidth = docPdf.getTextWidth(subStr);
 
-  // Ornamental Divider with Gold Center Diamond
+  const textColWidth = Math.max(titleWidth, subWidth);
+  const totalHeaderWidth = logoSize + gap + textColWidth;
+
+  // Exact starting X so the combined [Logo + Text] unit sits dead-center at 105mm
+  const headerStartX = (210 - totalHeaderWidth) / 2;
+  const textCenterX = headerStartX + logoSize + gap + textColWidth / 2;
+
+  if (activeCrest) {
+    try {
+      docPdf.addImage(
+        activeCrest,
+        "PNG",
+        headerStartX,
+        6.5,
+        logoSize,
+        logoSize
+      );
+    } catch (e) {}
+  }
+
+  // Draw "SRI BALAJI" centered in the text column
+  docPdf.setFont("times", "bold");
+  docPdf.setFontSize(24);
+  docPdf.setTextColor(15, 45, 74); // Deep Navy #0f2d4a
+  docPdf.text(titleStr, textCenterX, 16.5, { align: "center" });
+
+  // Draw "CLINICAL LABORATORY" centered directly underneath "SRI BALAJI"
+  docPdf.setFont("helvetica", "bold");
+  docPdf.setFontSize(10.2);
+  docPdf.setTextColor(13, 92, 133); // Clinical Teal #0d5c85
+  docPdf.text(subStr, textCenterX, 23, { align: "center" });
+
+  // C. Centered Ornamental Divider with Gold Diamond at X=105mm
   docPdf.setDrawColor(15, 45, 74);
   docPdf.setLineWidth(0.35);
-  docPdf.line(14, 30.5, 102.5, 30.5);
-  docPdf.line(107.5, 30.5, 196, 30.5);
+  docPdf.line(14, 31, 102.5, 31);
+  docPdf.line(107.5, 31, 196, 31);
 
   docPdf.setDrawColor(197, 155, 70);
   docPdf.setLineWidth(0.25);
-  docPdf.line(30, 31.1, 102.5, 31.1);
-  docPdf.line(107.5, 31.1, 180, 31.1);
+  docPdf.line(30, 31.6, 102.5, 31.6);
+  docPdf.line(107.5, 31.6, 180, 31.6);
 
   docPdf.setFillColor(197, 155, 70);
-  docPdf.triangle(103.2, 30.8, 105, 29.6, 105, 32.0, "F");
-  docPdf.triangle(106.8, 30.8, 105, 29.6, 105, 32.0, "F");
+  docPdf.triangle(103.2, 31.3, 105, 30.1, 105, 32.5, "F");
+  docPdf.triangle(106.8, 31.3, 105, 30.1, 105, 32.5, "F");
 
-  // Contact Info Line
+  // D. Centered Contact Strip
   docPdf.setFont("helvetica", "normal");
-  docPdf.setFontSize(7.8);
+  docPdf.setFontSize(8);
   docPdf.setTextColor(15, 45, 74);
   docPdf.text(
     "Sathiraju Complex, Main Road, Kothapeta  •  Ph: +91 9849923729  •  Email: prasad balajilab@gmail.com",
     105,
-    35.2,
+    36,
     { align: "center" }
   );
 };
 
 // =========================================================
-// 2. DEDICATED BOTTOM FOOTER DRAWER (STAMPED ON ALL PAGES)
-// Matches the Preview Window footer 100% and never clips!
+// 2. SAFE-MARGIN BOTTOM FOOTER (VISIBLE IN ALL PRINT & PDF TABS)
+// Drawn at Y=275mm–282mm so printers never clip it!
 // =========================================================
 export const drawSriBalajiFooter = (
   docPdf,
@@ -403,44 +424,44 @@ export const drawSriBalajiFooter = (
   includeSignature = true
 ) => {
   if (includeSignature) {
-    const sigY = 268;
+    const sigY = 261;
     docPdf.setDrawColor(15, 45, 74);
     docPdf.setLineWidth(0.35);
-    docPdf.line(140, sigY, 194, sigY);
+    docPdf.line(142, sigY, 194, sigY);
 
     docPdf.setFont("helvetica", "bold");
     docPdf.setFontSize(9);
     docPdf.setTextColor(15, 45, 74);
-    docPdf.text("Authorized Signatory", 167, sigY + 4.5, { align: "center" });
+    docPdf.text("Authorized Signatory", 168, sigY + 4.5, { align: "center" });
 
     docPdf.setFont("helvetica", "normal");
     docPdf.setFontSize(7.5);
     docPdf.setTextColor(100, 116, 139);
-    docPdf.text("Sri Balaji Clinical Laboratory", 167, sigY + 8.5, {
+    docPdf.text("Sri Balaji Clinical Laboratory", 168, sigY + 8.5, {
       align: "center"
     });
   }
 
   if (!useLetterhead) return;
 
-  // Side Navy Lines + TRUST • ACCURACY • CARE (y = 283.5mm)
+  // Side Navy Lines + TRUST • ACCURACY • CARE (Y = 275.5mm)
   docPdf.setDrawColor(15, 45, 74);
   docPdf.setLineWidth(0.45);
-  docPdf.line(14, 283.5, 68, 283.5);
-  docPdf.line(142, 283.5, 196, 283.5);
+  docPdf.line(14, 275.5, 68, 275.5);
+  docPdf.line(142, 275.5, 196, 275.5);
 
   docPdf.setFont("helvetica", "bold");
   docPdf.setFontSize(8);
   docPdf.setTextColor(15, 45, 74);
-  docPdf.text("TRUST   •   ACCURACY   •   CARE", 105, 284.4, {
+  docPdf.text("TRUST   •   ACCURACY   •   CARE", 105, 276.4, {
     align: "center"
   });
 
-  // Slim Gold & Navy Bottom Stripes (y = 287.5mm - 291mm, safe inside all PDF viewers)
+  // Slim Gold & Navy Bottom Stripes (Y = 279mm - 282mm, 15mm inside paper edge)
   docPdf.setFillColor(197, 155, 70);
-  docPdf.rect(14, 287.2, 182, 0.9, "F");
+  docPdf.rect(14, 279.0, 182, 0.9, "F");
   docPdf.setFillColor(15, 45, 74);
-  docPdf.rect(14, 288.1, 182, 2.2, "F");
+  docPdf.rect(14, 279.9, 182, 2.1, "F");
 };
 
 export const getTestKey = (t, idx) => {
@@ -455,7 +476,6 @@ export const evaluateAutoFlag = (rawValue, refRange) => {
   }
   const strVal = String(rawValue).trim();
 
-  // Flag qualitative positive markers like (+), (++), (+++), Positive, Reactive
   if (
     strVal.includes("+") ||
     /^(positive|reactive|present|detected)$/i.test(strVal)
@@ -671,11 +691,15 @@ const buildReportPdfDocument = (
   results,
   useLetterhead = true
 ) => {
-  const docPdf = new jsPDF();
+  const docPdf = new jsPDF({
+    orientation: "portrait",
+    unit: "mm",
+    format: "a4"
+  });
 
   drawSriBalajiLetterhead(docPdf, useLetterhead);
 
-  const startY = useLetterhead ? 42 : 20;
+  const startY = useLetterhead ? 43 : 20;
 
   docPdf.setDrawColor(203, 213, 225);
   docPdf.setLineWidth(0.3);
@@ -729,7 +753,8 @@ const buildReportPdfDocument = (
     };
     const resolved = resolveTestRefAndUnit(t);
     const finalRange = res.customRefRange || resolved.refRange || "-";
-    const finalUnit = res.customUnit !== undefined ? res.customUnit : resolved.unit;
+    const finalUnit =
+      res.customUnit !== undefined ? res.customUnit : resolved.unit;
 
     tableRows.push({
       isHeader: false,
@@ -746,7 +771,7 @@ const buildReportPdfDocument = (
 
   docPdf.autoTable({
     startY: startY + 18,
-    margin: { top: 42, bottom: 32, left: 14, right: 14 },
+    margin: { top: 43, bottom: 40, left: 14, right: 14 },
     head: [
       ["Test Description", "Result Value", "Flag", "Reference Range", "Unit"]
     ],
@@ -759,12 +784,16 @@ const buildReportPdfDocument = (
       lineColor: [203, 213, 225],
       lineWidth: 0.2,
       fontSize: 8.8,
-      cellPadding: 2.2
+      cellPadding: 2.1
     },
     willDrawPage: function (data) {
       if (data.pageNumber > 1 && useLetterhead) {
         drawSriBalajiLetterhead(docPdf, true);
       }
+    },
+    didDrawPage: function () {
+      // Drawn inside didDrawPage so every page in Print & Download gets the footer!
+      drawSriBalajiFooter(docPdf, useLetterhead, true);
     },
     didParseCell: function (data) {
       if (data.section === "body") {
@@ -790,51 +819,48 @@ const buildReportPdfDocument = (
     }
   });
 
-  // Stamp Signature & Bottom Footer across all pages so it is NEVER missing
-  const totalPages = docPdf.internal.getNumberOfPages();
-  for (let i = 1; i <= totalPages; i++) {
-    docPdf.setPage(i);
-    drawSriBalajiFooter(docPdf, useLetterhead, i === totalPages);
-  }
-
   return docPdf;
 };
 
 const buildBillPdfDocument = (booking) => {
-  const docPdf = new jsPDF();
+  const docPdf = new jsPDF({
+    orientation: "portrait",
+    unit: "mm",
+    format: "a4"
+  });
 
   drawSriBalajiLetterhead(docPdf, true);
 
   docPdf.setFont("helvetica", "bold");
   docPdf.setFontSize(11);
   docPdf.setTextColor(15, 45, 74);
-  docPdf.text("PATIENT BILL / PAYMENT RECEIPT", 105, 42, { align: "center" });
+  docPdf.text("PATIENT BILL / PAYMENT RECEIPT", 105, 43, { align: "center" });
 
   docPdf.setDrawColor(203, 213, 225);
   docPdf.setLineWidth(0.3);
-  docPdf.roundedRect(14, 45, 182, 18.5, 2, 2, "S");
+  docPdf.roundedRect(14, 46, 182, 18.5, 2, 2, "S");
 
   docPdf.setFont("helvetica", "bold");
   docPdf.setFontSize(9);
   docPdf.setTextColor(15, 45, 74);
-  docPdf.text(`Patient Name : ${booking.name || "N/A"}`, 18, 50);
+  docPdf.text(`Patient Name : ${booking.name || "N/A"}`, 18, 51);
   docPdf.text(
     `Age / Gender : ${booking.age || "N/A"} Yrs / ${booking.gender || "N/A"}`,
     18,
-    55.5
+    56.5
   );
-  docPdf.text(`Phone        : ${booking.phone || "N/A"}`, 18, 61);
+  docPdf.text(`Phone        : ${booking.phone || "N/A"}`, 18, 62);
 
   docPdf.text(
     `Receipt / ID : ${booking.clinicalId || booking.bookingRef || "N/A"}`,
     120,
-    50
+    51
   );
-  docPdf.text(`Date         : ${booking.date || "N/A"}`, 120, 55.5);
+  docPdf.text(`Date         : ${booking.date || "N/A"}`, 120, 56.5);
   docPdf.text(
     `Collection   : ${booking.collectionType === "home" ? "Home Visit" : "Lab Visit"}`,
     120,
-    61
+    62
   );
 
   const items =
@@ -849,8 +875,8 @@ const buildBillPdfDocument = (booking) => {
   ]);
 
   docPdf.autoTable({
-    startY: 67,
-    margin: { top: 42, bottom: 32, left: 14, right: 14 },
+    startY: 68,
+    margin: { top: 43, bottom: 40, left: 14, right: 14 },
     head: [["#", "Test / Health Package Description", "Amount"]],
     body: bodyData,
     theme: "grid",
@@ -860,6 +886,9 @@ const buildBillPdfDocument = (booking) => {
       if (data.pageNumber > 1) {
         drawSriBalajiLetterhead(docPdf, true);
       }
+    },
+    didDrawPage: function () {
+      drawSriBalajiFooter(docPdf, true, true);
     }
   });
 
@@ -890,7 +919,7 @@ const buildBillPdfDocument = (booking) => {
 
   docPdf.autoTable({
     startY: docPdf.lastAutoTable.finalY + 5,
-    margin: { left: 110, right: 14, bottom: 32 },
+    margin: { left: 110, right: 14, bottom: 40 },
     body: summaryRows,
     theme: "plain",
     styles: {
@@ -912,12 +941,6 @@ const buildBillPdfDocument = (booking) => {
       }
     }
   });
-
-  const totalPages = docPdf.internal.getNumberOfPages();
-  for (let i = 1; i <= totalPages; i++) {
-    docPdf.setPage(i);
-    drawSriBalajiFooter(docPdf, true, i === totalPages);
-  }
 
   return docPdf;
 };
